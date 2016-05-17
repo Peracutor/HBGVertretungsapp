@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    android:title="@string/action_settings">
+
+    <PreferenceCategory android:title="@string/show_notifications">
+        <CheckBoxPreference
+            android:title="@string/show_notifications"
+            android:key="notification_switch"
+            android:defaultValue="true"
+            android:widgetLayout="@layout/switch_compat"/>
+
+        <com.eissler.micha.hbgvertretungsapp.settings.TimePreference
+            android:key="time_for_alarm_1"
+            android:title="@string/notification_time_1"
+            android:defaultValue="1317652707" />
+
+        <com.eissler.micha.hbgvertretungsapp.settings.TimePreference
+            android:key="time_for_alarm_2"
+            android:title="@string/notification_time_2"
+            android:defaultValue="1360852707" />
+
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Anzeigenamen">
+        <PreferenceScreen android:title="Anzeigenamen der Fächer">
+            <intent android:action="com.eissler.micha.hbgvertretungsapp.CustomNames" />
+
+        </PreferenceScreen>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Kursfilter">
+
+        <CheckBoxPreference
+            android:title="Whitelist-Modus"
+            android:key="whitelist_switch"
+            android:defaultValue="false"
+            android:widgetLayout="@layout/switch_compat"
+            />
+
+        <PreferenceScreen android:title="Nicht angezeigte Fächer" android:key="hidden_subjects">
+            <intent android:action="com.eissler.micha.hbgvertretungsapp.HiddenSubjects" />
+
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:title="Anzuzeigende Fächer"
+            android:key="whitelist_subjects" >
+            <intent android:action="com.eissler.micha.hbgvertretungsapp.WhitelistSubjects" />
+        </PreferenceScreen>
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Updates">
+        <Preference
+            android:title="Nach Updates suchen"
+            android:key="update" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Kontakt">
+        <com.eissler.micha.hbgvertretungsapp.settings.MailToPreference
+            android:title="@string/mailto_me"
+            android:summary="@string/contact_me_summary"/>
+
+        <com.eissler.micha.hbgvertretungsapp.settings.EmailEditTextPreference
+            android:key="acra.user.email"
+            android:title="@string/pref_acra_user_email"
+            android:summary="@string/pref_acra_user_email_summary"
+            android:dialogMessage="@string/email_message"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Über">
+        <Preference android:title="Über"
+            android:key="about"/>
+    </PreferenceCategory>
+
+</PreferenceScreen>

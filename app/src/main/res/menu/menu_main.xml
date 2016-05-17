@@ -1,0 +1,19 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools" tools:context=".MainActivity">
+
+    <item
+        android:id="@+id/action_refresh"
+        android:orderInCategory="1"
+        app:showAsAction="never"
+        android:title="@string/refresh"/>
+    <!--android:icon="@drawable/ic_refresh_white_24dp"-->
+
+
+    <item android:id="@+id/show_in_webbrowser" android:title="@string/view_on_website"
+        android:orderInCategory="2" app:showAsAction="never" />
+
+    <item android:id="@+id/action_settings" android:title="@string/action_settings"
+        android:orderInCategory="3" app:showAsAction="never" />
+
+</menu>

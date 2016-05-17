@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HBG Vertretungsapp</string>
+
+    <string name="action_settings">Einstellungen</string>
+    <string name="defaultText">Lade…</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="dont_show_again">Meldungen zu diesem Fach nicht mehr anzeigen</string>
+    <string name="display_name">Anzeigename</string>
+
+    <string name="show_notifications">Benachrichtigungen</string>
+    <string name="notification_time_1">1. Benachrichtigungszeit</string>
+    <string name="notification_time_2">2. Benachrichtigungszeit</string>
+    <string name="title_activity_custom_names_list">Anzeigenamen der Fächer</string>
+    <string name="title_activity_hidden_subjects">Nicht angezeigte Fächer</string>
+    <string name="title_activity_whitelist_subjects">Anzuzeigende Fächer</string>
+
+
+    <string name="hourText">Stunde</string>
+    <string name="view_on_website">Zur Webseite wechseln</string>
+    <string name="title_activity_update">Update</string>
+    <string name="do_not_show">Nicht anzeigen</string>
+
+    <string name="pref_acra_user_email">Deine E-Mail-Adresse</string>
+    <string name="pref_acra_user_email_summary">Dass ich dich kontaktieren kann, falls auf deinem Gerät ein Fehler auftritt.</string>
+    <string name="mailto_me">Kontaktiere mich per E-Mail</string>
+    <string name="contact_me_summary">Melde mir Fehler oder gib Feedback und Verbesserungsvorschläge</string>
+    <string name="email_message">Folgende Adresse wird an mich gesendet, wenn ein Fehler in der App auftritt, sodass ich dich kontaktieren kann.</string>
+    <string name="add">Hinzufügen</string>
+
+    <string name="new_custom_name">Neuer Anzeigename des Faches:</string>
+    <string name="edit_text_label">Name des Faches, wie es auf der Webseite angezeigt wird:</string>
+    <string name="open">Klassenauswahl öffnen</string>
+    <string name="close">Klassenauswahl schließen</string>
+
+    <string name="next_week">Nächste Woche</string>
+    <string name="previous_week">Vorige Woche</string>
+
+    <string name="choose_class">Lade Klassenauswahl…</string>
+
+    <string name="crash_text">Aufgrund eines Fehlers ist die App abgestürzt. Ein Fehlerbericht wird gesendet.</string>
+    <string name="delete">Entfernen</string>
+    <string name="whitelist_label">Es werden ausschließlich Meldungen zu den folgenden Fächern angezeigt:</string>
+    <string name="label_custom_names_list">Folgende Anzeigenamen sind für die Fächer gespeichert:</string>
+    <string name="display_name_website">Umzubenennendes Fach</string>
+    <string name="new_display_name">Neuer Anzeigename</string>
+    <string name="label_hidden_subjects">Meldungen zu folgenden Fächern werden nicht angezeigt:</string>
+
+    <string name="error_image">ExclamationMarkImage</string>
+
+</resources>

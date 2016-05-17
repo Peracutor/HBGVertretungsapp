@@ -1,0 +1,22 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="NoActionBar" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+
+    <style name="PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <style name="HbgTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:alertDialogTheme">@style/HbgDialogTheme</item>
+    </style>
+
+    <style name="HbgDialogTheme" parent="Theme.AppCompat.Light.Dialog.Alert" >
+        <item name="colorAccent">@color/accent_material_light</item>
+        <item name="android:textColorPrimary">@android:color/black</item>
+    </style>
+
+</resources>
