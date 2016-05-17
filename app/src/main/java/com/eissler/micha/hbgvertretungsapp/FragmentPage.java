@@ -93,7 +93,7 @@ public class FragmentPage extends Fragment {
                 public void onDataEvaluationComplete(DataEvaluation.DataEvaluationException e, SortedCoverMessages sortedCoverMessages) {
                     if (e != null) {
                         e.printStackTrace();
-                        if (e.getErrorCode() == DataEvaluation.DataEvaluationException.NO_DATA) {
+                        if (e.getErrorCode() == DataEvaluation.DataEvaluationException.ErrorType.NO_DATA) {
                             listView.setAdapter(HbgListAdapter.getNoDataAdapter(getContext()));
                             noData = true;
                             EventBus.getDefault().post(new Event.ListViewChange(listView));

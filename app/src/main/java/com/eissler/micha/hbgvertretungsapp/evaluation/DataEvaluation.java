@@ -152,7 +152,7 @@ public class DataEvaluation {
 //        MainActivity.progressBar.setVisibility(View.VISIBLE);
 
         if (!App.isConnected(context)) {
-            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es besteht keine Internetverbindung", DataEvaluationException.NO_CONNECTION), null);
+            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es besteht keine Internetverbindung", DataEvaluationException.ErrorType.NO_CONNECTION), null);
             return;
         }
 
@@ -168,18 +168,18 @@ public class DataEvaluation {
                         if (htmlText == null || e != null) {
                             if (e instanceof FileNotFoundException) {
 
-                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es liegen keine Vertretungsdaten vor", e, DataEvaluationException.NO_DATA), null);
+                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es liegen keine Vertretungsdaten vor", e, DataEvaluationException.ErrorType.NO_DATA), null);
                             } else if (e instanceof SocketException || e instanceof UnknownHostException || e instanceof SocketTimeoutException || e instanceof TimeoutException) {
-                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es konnte keine Internetverbingung hergestellt werden", e, DataEvaluationException.BAD_CONNECTION), null);
+                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Es konnte keine Internetverbingung hergestellt werden", e, DataEvaluationException.ErrorType.BAD_CONNECTION), null);
                             } else {
-                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Ein unbekannter Fehler ist aufgetreten", e, DataEvaluationException.ERROR), null); // TODO: 02.05.2016 EOF Exception
+                                dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("Ein unbekannter Fehler ist aufgetreten", e, DataEvaluationException.ErrorType.ERROR), null); // TODO: 02.05.2016 EOF Exception
                             }
                             return;
                         }
 
                         if (htmlText.contains("keine Vertretungsdaten")) {
 //                            whySortedDataMapIsNull.put(weekNumber, NO_DATA);
-                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No Data2", DataEvaluationException.NO_DATA), null);
+                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No Data2", DataEvaluationException.ErrorType.NO_DATA), null);
                             return;
                         }
 
@@ -188,13 +188,13 @@ public class DataEvaluation {
                         Elements tables = document.select("table"); //select the first table.
                         if (tables.size() == 0) {
 //                            whySortedDataMapIsNull.put(weekNumber, NO_DATA);
-                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No Data3", DataEvaluationException.NO_DATA), null);
+                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No Data3", DataEvaluationException.ErrorType.NO_DATA), null);
                             return;
                         }
 
                         Elements rows = tables.get(0).select("tr");
                         if (rows.isEmpty()) {
-                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No rows in the table", DataEvaluationException.ERROR), null);
+                            dataEvaluationInterface.onDataEvaluationComplete(new DataEvaluationException("No rows in the table", DataEvaluationException.ErrorType.ERROR), null);
                             return;
                         }
 
@@ -350,25 +350,28 @@ public class DataEvaluation {
 
 
     public static class DataEvaluationException extends Exception {
-        public static final Integer NO_DATA = 1;
-        public static final Integer NO_CONNECTION = 2;
-        public static final Integer BAD_CONNECTION = 3;
-        public static final Integer ERROR = 4;
 
-        private int errorCode;
+        private ErrorType errorType;
 
-        public DataEvaluationException(String message, int errorCode) {
+        public enum ErrorType {
+            NO_DATA,
+            BAD_CONNECTION,
+            NO_CONNECTION,
+            ERROR
+        }
+
+        public DataEvaluationException(String message, ErrorType errorType) {
             super(message);
-            this.errorCode = errorCode;
+            this.errorType = errorType;
         }
 
-        public DataEvaluationException(String message, Exception cause, int errorCode) {
+        public DataEvaluationException(String message, Exception cause, ErrorType errorType) {
             super(message, cause);
-            this.errorCode = errorCode;
+            this.errorType = errorType;
         }
 
-        public int getErrorCode() {
-            return errorCode;
+        public ErrorType getErrorCode() {
+            return errorType;
         }
     }
 }

@@ -17,6 +17,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
+import static com.eissler.micha.hbgvertretungsapp.evaluation.DataEvaluation.DataEvaluationException.ErrorType;
 
 public class CheckForNewDataService extends IntentService {
     private CountDownLatch termination;
@@ -44,17 +45,17 @@ public class CheckForNewDataService extends IntentService {
                 System.out.println("onDataEvaluationComplete");
                 if (e != null) {
                     e.printStackTrace();
-                    if (e.getErrorCode() == DataEvaluation.DataEvaluationException.NO_DATA) {
+                    if (e.getErrorCode() == ErrorType.NO_DATA) {
                         System.out.println("e.getMessage() = " + e.getMessage());
                         showNotification(getNoDataBuilder());
                     }
-                    else if (e.getErrorCode() == DataEvaluation.DataEvaluationException.NO_CONNECTION) {
+                    else if (e.getErrorCode() == ErrorType.NO_CONNECTION) {
                         showNotification(makeBuilder("Es besteht keine Internetverbindung"));
                     }
-                    else if (e.getErrorCode() == DataEvaluation.DataEvaluationException.BAD_CONNECTION) {
+                    else if (e.getErrorCode() == ErrorType.BAD_CONNECTION) {
                         showNotification(makeBuilder("Internetverbindung konnte nicht hergestellt werden"));
                     }
-                    else if (e.getErrorCode() == DataEvaluation.DataEvaluationException.ERROR) {
+                    else if (e.getErrorCode() == ErrorType.ERROR) {
                         showNotification(makeBuilder("Beim Herunterladen ist ein Fehler aufgetreten"));
                     }
                     return;
