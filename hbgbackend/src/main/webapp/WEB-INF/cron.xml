@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cronentries>
+    <!--todo cron jobs-->
+    <cron>
+        <url>/cron/hbg-poll</url>
+        <description>HBG poll-job</description>
+        <schedule>every 5 minutes from 6:30 to 22:30</schedule>
+        <timezone>Europe/Berlin</timezone>
+    </cron>
+</cronentries>

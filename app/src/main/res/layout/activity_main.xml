@@ -10,6 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         >
+
         <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -17,85 +18,29 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <!--<include layout="@layout/toolbar" android:id="@+id/tool_bar"/>-->
-            <!--<TextView-->
-                <!--android:id="@+id/stand"-->
-                <!--android:layout_width="wrap_content"-->
-                <!--android:layout_height="wrap_content"-->
-                <!--android:textStyle="italic"-->
-                <!--android:layout_gravity="left"-->
-                <!--android:padding="4dp"-->
-                <!--android:text="Stand: 23.23.23"-->
-                <!--/>-->
-
-            <!--<ProgressBar-->
-            <!--style="?android:attr/progressBarStyleHorizontal"-->
-            <!--xmlns:android="http://schemas.android.com/apk/res/android"-->
-
-            <!--android:id="@+id/progressBar"-->
-            <!--android:layout_width="match_parent"-->
-            <!--android:layout_height="10dp"-->
-            <!--android:minHeight="10dp"-->
-            <!--android:indeterminate="true"-->
-            <!--android:visibility="invisible"-->
-            <!--android:layout_gravity="center_horizontal"-->
-            <!--/>-->
-
-
-            <android.support.v7.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <com.viewpagerindicator.TitlePageIndicator
-                    android:id="@+id/titles"
-                    android:layout_height="wrap_content"
-                    android:layout_width="match_parent"
-                    app:footerColor="@color/primary_material_dark"
-                    android:textColor="@android:color/black"
-                    app:footerLineHeight="1dp"
-                    app:footerIndicatorHeight="3dp"
-                    app:footerIndicatorStyle="underline"
-                    app:selectedColor="@color/primary_material_dark"
-                    app:selectedBold="true"
-                    />
-
-            </android.support.v7.widget.CardView>
-
-            <android.support.v7.widget.CardView
-                android:id="@+id/error_card"
-                android:layout_width="match_parent"
+            <com.viewpagerindicator.TitlePageIndicator
+                android:id="@+id/titles"
                 android:layout_height="wrap_content"
-                android:visibility="gone"
-                app:cardBackgroundColor="@color/pergament">
+                android:layout_width="match_parent"
+                android:textColor="@android:color/black"
+                app:selectedColor="@color/primary_material_dark"
+                app:selectedBold="true"
+                app:footerIndicatorStyle="none"
+                app:footerIndicatorHeight="3dp"
+                app:footerLineHeight="0dp"
+                />
 
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+            <!--<com.flyco.tablayout.SlidingTabLayout-->
+                <!--android:id="@+id/titles"-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--app:tl_textUnselectColor="@android:color/black"-->
+                <!--app:tl_indicator_color="@color/primary_material_dark"-->
+                <!--app:tl_divider_color="@color/primary_material_dark"-->
+                <!--app:tl_indicator_style="NORMAL"-->
 
-                    <ImageView
-                        android:id="@+id/error_image"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_error_black_24dp"
-                        android:layout_alignParentLeft="true"
-                        android:layout_alignParentStart="true"
-                        android:layout_alignParentTop="true"
-                        android:layout_margin="10dp"
-                        android:contentDescription="@string/error_image" />
-
-                    <TextView
-                        android:id="@+id/error_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:layout_toRightOf="@id/error_image"
-                        android:layout_toEndOf="@id/error_image"
-                        android:paddingBottom="10dp"
-                        android:paddingTop="10dp"
-                        />
-
-                </RelativeLayout>
-            </android.support.v7.widget.CardView>
+                <!--/>-->
+            <!--app:footerColor="@color/primary_material_dark"-->
 
             <android.support.v4.view.ViewPager
                 android:id="@+id/view_pager"
@@ -103,11 +48,24 @@
                 android:layout_height="wrap_content"
                 />
 
+            <tr.xip.errorview.ErrorView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:id="@+id/error_view"
+                android:visibility="gone"
+
+                app:ev_title="@string/global_error"
+                app:ev_showSubtitle="true"
+                app:ev_showRetryButton="true"
+                app:ev_retryButtonText="@string/act_ma_refresh"
+                app:ev_retryButtonTextColor="@color/accent_material_light"
+                />
+
         </LinearLayout>
+
     </com.eissler.micha.hbgvertretungsapp.SwipeRefreshLayout>
 
-
-<ListView android:id="@+id/left_drawer"
+    <ListView android:id="@+id/left_drawer"
         android:layout_width="240dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
@@ -117,9 +75,5 @@
         android:background="#ffffff"
 
         />
-
-
-
-
 
 </android.support.v4.widget.DrawerLayout>

@@ -3,7 +3,6 @@ package com.eissler.micha.hbgvertretungsapp;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,16 +11,19 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import java.io.IOException;
+import com.eissler.micha.hbgvertretungsapp.settings.CustomNames;
+import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
+
 import java.util.Map;
 
 public class FilterDialog {
 
     private static final String DISPLAY_NAME = "Anzeigename für \"%s\":";
 
-    private final AlertDialog.Builder mBuilder;
+    private final AlertDialog mDialog;
     private final EditText kursName;
     private final InputMethodManager inputManager;
+    private String errorText;
 
     public FilterDialog(String subject, PostExecuteInterface postExecuteInterface, Context context) {
         this(subject, null, postExecuteInterface, context);
@@ -48,20 +50,12 @@ public class FilterDialog {
         final CheckBox checkBox = (CheckBox) dialogView.findViewById(R.id.checkbox);
         final TextView editTextLabel = (TextView) dialogView.findViewById(R.id.edit_text_label);
 
-        if (PreferenceManager.getDefaultSharedPreferences(context).getBoolean("whitelist_switch", false)) {
+        if (Whitelist.isWhitelistModeActive(context)) {
             checkBox.setVisibility(View.GONE);
         }
 
         if (customNames == null) {
-            try {
-                customNames = new CustomNames(context);
-            } catch (Exception e) {
-                System.err.println("Unexpected Error");
-                App.reportUnexpectedException(e);
-                e.printStackTrace();
-                mBuilder = App.dialog("Fehler", "Es ist ein unerwarteter Fehler aufgetreten", context);
-                return;
-            }
+            customNames = CustomNames.get(context);
         }
 
         final CustomNames customNamesFinal = customNames;
@@ -86,80 +80,92 @@ public class FilterDialog {
         checkBox.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                boolean wasEnabled = kursName.isEnabled();
-                if (!wasEnabled) {
+                boolean checked = checkBox.isChecked();
+                if (!checked) {
                     inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                    kursName.setError(errorText);
+                } else {
+                    kursName.setError(null);
                 }
-                kursName.setEnabled(!wasEnabled);
+                kursName.setEnabled(!checked);
+
+                if (mDialog != null) {
+                    mDialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(checked || errorText == null);
+                }
             }
         });
 
         final String originalSubject_final = originalSubject;
+        final String oldName = customNamesFinal.get(originalSubject_final) == null ? originalSubject : customNamesFinal.get(originalSubject_final);
 
         builder.setPositiveButton("Speichern", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 String displayName = kursName.getText().toString();
 
-                if (displayName.trim().equals("")) {
-                    displayName = originalSubject_final;
-                }
-
                 if (checkBox.isChecked()) {
                     displayName = "Nicht anzeigen";
                 }
 
-                String subjectKey = finalSubject;
-
-                for (Map.Entry<String, String> entry : customNamesFinal.entrySet()) {
-                    if (entry.getValue().equals(subjectKey)) {
-                        subjectKey = entry.getKey();
-                    }
-                }
-
-                if (customNamesFinal.get(subjectKey) != null && customNamesFinal.get(subjectKey).equals(displayName)) {
+                if (displayName.equals(oldName)) {
                     return;
                 }
 
-                for (Map.Entry<String, String> entry : customNamesFinal.entrySet()) {
-                    if (!displayName.equals("Nicht anzeigen") && displayName.equals(entry.getValue())) {
-                        App.dialog("Eingabefehler", "\"" + displayName + "\" ist schon der Anzeigename für \"" + entry.getKey() + "\"", context)
-                                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        new FilterDialog(finalSubject, customNamesFinal, postExecuteInterface, context).show();
-
-                                    }
-                                })
-                                .show();
-                        return;
-                    }
-                }
-
-                if (displayName.equals(subjectKey)) {
-                    customNamesFinal.remove(subjectKey);
+                if (displayName.equals(originalSubject_final)) {
+                    customNamesFinal.remove(originalSubject_final);
                 } else {
-                    customNamesFinal.put(subjectKey, displayName);
+                    customNamesFinal.put(originalSubject_final, displayName);
                 }
 
                 customNamesFinal.save();
 
                 postExecuteInterface.onPostExecute();
 
-
                 inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
                 System.out.println("Gespeichert: " + displayName);
             }
         })
-            .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
-                    System.out.println("Nicht gespeichert");
-                }
-            });
+        .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
+                System.out.println("Nicht gespeichert");
+            }
+        });
 
-        mBuilder = builder;
+        mDialog = builder.show();
+
+
+        kursName.addTextChangedListener(new InputValidator() {
+            @Override
+            protected boolean validate(String text) {
+                if (text.equals(oldName)) {
+                    return true;
+                }
+
+                if (text.trim().length() == 0) {
+                    kursName.setError(errorText = "Der Anzeigename darf nicht leer sein");
+                    return false;
+                }
+
+                if (!text.equals("Nicht anzeigen")) {
+                    for (Map.Entry<String, String> entry : customNamesFinal.entrySet()) {
+                        if (text.equals(entry.getValue())) {
+                            kursName.setError(errorText = "\"" + text + "\" ist schon der Anzeigename für \"" + entry.getKey() + "\"");
+                            return false;
+                        }
+                    }
+                }
+
+                errorText = null;
+                return true;
+            }
+
+            @Override
+            protected void onValidated(boolean valid) {
+                mDialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(valid);
+            }
+        });
     }
 
     public static String getOriginalSubject(String subject, CustomNames customNames) {
@@ -181,8 +187,12 @@ public class FilterDialog {
     }
 
     public void show() {
-        mBuilder.show();
-        inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+        show(true);
+    }
+
+    public void show(boolean toggleKeyboard) {
+        mDialog.show();
+        if (toggleKeyboard) inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
     }
 
     public interface PostExecuteInterface {

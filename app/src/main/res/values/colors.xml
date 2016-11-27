@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!--<color name="item_selected">#84B39B</color>-->
-    <color name="item_not_selected">#3c84000d</color>
     <color name="selected" >#79ff4924</color>
+
     <!--<color name="selected" >#642885ff</color>-->
 
     <color tools:override="true" name="accent_material_light">#d50000</color>

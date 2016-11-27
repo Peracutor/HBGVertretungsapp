@@ -5,8 +5,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
+
+import com.eissler.micha.hbgvertretungsapp.fcm.InstanceIdListenerService;
 
 public class ConnectivityChangeReceiver extends BroadcastReceiver {
     @Override
@@ -15,19 +15,20 @@ public class ConnectivityChangeReceiver extends BroadcastReceiver {
             return;
         }
 
-        ConnectivityManager cm =
-                (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        System.out.println("ConnectivityChangeReceiver.onReceive");
+        if (App.isConnected(context)) {
+            System.out.println("Connected");
+            enable(false, context);
 
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        boolean isConnected = activeNetwork != null &&
-                activeNetwork.isConnectedOrConnecting();
-
-        if (isConnected) {
-            Intent forwardIntent = new Intent(context, CheckForNewDataService.class);
-            context.startService(forwardIntent);
-
-            ComponentName receiver = new ComponentName(context, ConnectivityChangeReceiver.class);
-            context.getPackageManager().setComponentEnabledSetting(receiver, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+            InstanceIdListenerService.sendRegistrationToServer(context);
+//            Intent forwardIntent = new Intent(context, NotificationService.class);
+//            context.startService(forwardIntent);
         }
+    }
+
+    public static void enable(boolean enable, Context context) {
+        System.out.println("ConnectivityChangeReceiver.enable");
+        ComponentName receiver = new ComponentName(context, ConnectivityChangeReceiver.class);
+        context.getPackageManager().setComponentEnabledSetting(receiver, enable ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
     }
 }

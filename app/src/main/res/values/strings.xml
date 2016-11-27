@@ -4,7 +4,6 @@
 
     <string name="action_settings">Einstellungen</string>
     <string name="defaultText">Lade…</string>
-    <string name="refresh">Aktualisieren</string>
     <string name="dont_show_again">Meldungen zu diesem Fach nicht mehr anzeigen</string>
     <string name="display_name">Anzeigename</string>
 
@@ -12,8 +11,8 @@
     <string name="notification_time_1">1. Benachrichtigungszeit</string>
     <string name="notification_time_2">2. Benachrichtigungszeit</string>
     <string name="title_activity_custom_names_list">Anzeigenamen der Fächer</string>
-    <string name="title_activity_hidden_subjects">Nicht angezeigte Fächer</string>
-    <string name="title_activity_whitelist_subjects">Anzuzeigende Fächer</string>
+    <string name="title_activity_hidden_subjects">Versteckte Fächer</string>
+    <string name="title_activity_whitelist_subjects">Whitelist-Fächer</string>
 
 
     <string name="hourText">Stunde</string>
@@ -25,18 +24,12 @@
     <string name="pref_acra_user_email_summary">Dass ich dich kontaktieren kann, falls auf deinem Gerät ein Fehler auftritt.</string>
     <string name="mailto_me">Kontaktiere mich per E-Mail</string>
     <string name="contact_me_summary">Melde mir Fehler oder gib Feedback und Verbesserungsvorschläge</string>
-    <string name="email_message">Folgende Adresse wird an mich gesendet, wenn ein Fehler in der App auftritt, sodass ich dich kontaktieren kann.</string>
     <string name="add">Hinzufügen</string>
 
     <string name="new_custom_name">Neuer Anzeigename des Faches:</string>
     <string name="edit_text_label">Name des Faches, wie es auf der Webseite angezeigt wird:</string>
     <string name="open">Klassenauswahl öffnen</string>
     <string name="close">Klassenauswahl schließen</string>
-
-    <string name="next_week">Nächste Woche</string>
-    <string name="previous_week">Vorige Woche</string>
-
-    <string name="choose_class">Lade Klassenauswahl…</string>
 
     <string name="crash_text">Aufgrund eines Fehlers ist die App abgestürzt. Ein Fehlerbericht wird gesendet.</string>
     <string name="delete">Entfernen</string>
@@ -47,5 +40,20 @@
     <string name="label_hidden_subjects">Meldungen zu folgenden Fächern werden nicht angezeigt:</string>
 
     <string name="error_image">ExclamationMarkImage</string>
+    <string name="share">Teilen</string>
+    <string name="title_activity_notificationview">Nachricht</string>
+
+    <string name="act_nv_download_image">Lade Bild herunter…</string>
+
+    <string name="act_ma_choose_class">Wähle deine Klasse</string>
+    <string name="act_ma_class_selection">Klassenauswahl</string>
+    <string name="act_ma_loading_classes">Lade Klassenauswahl…</string>
+    <string name="act_ma_del_install_apk_success">Installationsdatei erfolgreich gelöscht</string>
+    <string name="act_ma_del_install_apk_failure">Installationsdatei konnte nicht gelöscht werden</string>
+    <string name="act_ma_last_reload">"Letzte Aktualisierung: "</string>
+    <string name="act_ma_no_week_selected">Es ist keine Woche ausgewählt!</string>
+    <string name="act_ma_refreshing">Aktualisiere…</string>
+    <string name="act_ma_refresh">Aktualisieren</string>
+    <string name="global_error">Ups…</string>
 
 </resources>

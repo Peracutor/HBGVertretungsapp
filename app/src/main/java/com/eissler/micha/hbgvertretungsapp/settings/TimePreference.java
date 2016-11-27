@@ -87,6 +87,6 @@ public class TimePreference extends DialogPreference {
         if (calendar == null) {
             return null;
         }
-        return DateFormat.getTimeFormat(getContext()).format(new Date(calendar.getTimeInMillis()));
+        return DateFormat.getTimeFormat(getContext()).format(new Date(calendar.getTimeInMillis())) + " Uhr";
     }
 }

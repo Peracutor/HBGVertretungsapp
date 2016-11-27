@@ -1,7 +1,6 @@
 package com.eissler.micha.hbgvertretungsapp;
 
 import android.content.Context;
-import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 
 import org.greenrobot.eventbus.EventBus;
@@ -31,14 +30,13 @@ public class SwipeRefreshLayout extends android.support.v4.widget.SwipeRefreshLa
 
     @Override
     public boolean canChildScrollUp() {
-//        return !canRefresh || viewPager != null && ((CustomListView) ((HbgPagerAdapter) viewPager.getAdapter()).getListView(viewPager.getCurrentItem())).canScrollUp();
         return canScrollUp;
     }
 
     @Subscribe
     public void setCanScrollUp(Event.CanScrollUp canScrollUpEvent) {
-        System.out.println("CanScrollUp received");
-        this.canScrollUp = canScrollUpEvent.canScrollUp();
+        canScrollUp = canScrollUpEvent.canScrollUp();
+        System.out.println("canScrollUp = " + canScrollUp);
     }
 
 }

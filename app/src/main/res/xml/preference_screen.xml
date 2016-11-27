@@ -7,47 +7,69 @@
             android:title="@string/show_notifications"
             android:key="notification_switch"
             android:defaultValue="true"
+            android:summaryOn="An"
+            android:summaryOff="Aus"
             android:widgetLayout="@layout/switch_compat"/>
 
         <com.eissler.micha.hbgvertretungsapp.settings.TimePreference
             android:key="time_for_alarm_1"
             android:title="@string/notification_time_1"
+            android:dependency="notification_switch"
             android:defaultValue="1317652707" />
 
         <com.eissler.micha.hbgvertretungsapp.settings.TimePreference
             android:key="time_for_alarm_2"
             android:title="@string/notification_time_2"
+            android:dependency="notification_switch"
             android:defaultValue="1360852707" />
 
+        <CheckBoxPreference
+            android:title="Push-Benachrichtigungen"
+            android:key="push_notifications"
+            android:defaultValue="false"
+            android:summary="Erhalte Benachrichtigungen bei neuen Meldungen zu deiner Whitelist"
+            android:widgetLayout="@layout/switch_compat"
+            />
 
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Anzeigenamen">
-        <PreferenceScreen android:title="Anzeigenamen der Fächer">
+    <PreferenceCategory android:title="Fächer">
+
+        <PreferenceScreen android:title="Anzeigenamen"
+            android:summary="Ändere die Anzeigenamen der Fächer">
             <intent android:action="com.eissler.micha.hbgvertretungsapp.CustomNames" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:title="Versteckte Fächer"
+            android:summary="Fächer, die dir nicht angezeigt werden sollen"
+            android:key="hidden_subjects" >
+            <intent android:action="com.eissler.micha.hbgvertretungsapp.HiddenSubjects" />
 
         </PreferenceScreen>
-    </PreferenceCategory>
-
-    <PreferenceCategory android:title="Kursfilter">
 
         <CheckBoxPreference
             android:title="Whitelist-Modus"
             android:key="whitelist_switch"
             android:defaultValue="false"
+            android:summaryOn="An"
+            android:summaryOff="Aus"
             android:widgetLayout="@layout/switch_compat"
             />
 
-        <PreferenceScreen android:title="Nicht angezeigte Fächer" android:key="hidden_subjects">
-            <intent android:action="com.eissler.micha.hbgvertretungsapp.HiddenSubjects" />
-
-        </PreferenceScreen>
-
         <PreferenceScreen
-            android:title="Anzuzeigende Fächer"
-            android:key="whitelist_subjects" >
+            android:title="Whitelist-Fächer"
+            android:summary="Fächer, die dir ausschließlich angezeigt werden sollen"
+            android:key="whitelist_subjects"
+            android:dependency="whitelist_switch">
             <intent android:action="com.eissler.micha.hbgvertretungsapp.WhitelistSubjects" />
         </PreferenceScreen>
+
+        <Preference
+            android:title="Automatische Fachbenennung"
+            android:summary="Whitelist-Fächer automatisch umbenennen lassen"
+            android:key="auto-name"
+            android:dependency="whitelist_switch" />
 
     </PreferenceCategory>
 
@@ -57,21 +79,36 @@
             android:key="update" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Fehlerbehebung">
+        <CheckBoxPreference
+            android:title="CPU aufwecken"
+            android:key="alarm_wake_up"
+            android:summary="CPU für Benachrichtigungen aufwecken"
+            android:defaultValue="false"
+            android:widgetLayout="@layout/switch_compat" />
+
+        <Preference
+            android:title="Energiespar-Apps deaktivieren"
+            android:key="battery_saver" />
+
+        <Preference
+            android:title="Push-Benachrichtigung testen"
+            android:summary="Teste ob du Push-Benachrichtigungen erhalten kannst"
+            android:key="push_test"
+            />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="Kontakt">
+
         <com.eissler.micha.hbgvertretungsapp.settings.MailToPreference
             android:title="@string/mailto_me"
             android:summary="@string/contact_me_summary"/>
 
-        <com.eissler.micha.hbgvertretungsapp.settings.EmailEditTextPreference
-            android:key="acra.user.email"
-            android:title="@string/pref_acra_user_email"
-            android:summary="@string/pref_acra_user_email_summary"
-            android:dialogMessage="@string/email_message"/>
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Über">
-        <Preference android:title="Über"
-            android:key="about"/>
-    </PreferenceCategory>
+    <!--<PreferenceCategory android:title="Über">-->
+        <!--<Preference android:title="Über"-->
+            <!--android:key="about"/>-->
+    <!--</PreferenceCategory>-->
 
 </PreferenceScreen>

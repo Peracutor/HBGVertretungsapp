@@ -1,94 +1,85 @@
 package com.eissler.micha.hbgvertretungsapp;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
+import android.annotation.SuppressLint;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.StrictMode;
-import android.preference.PreferenceManager;
-import android.support.v4.content.LocalBroadcastManager;
+import android.support.design.widget.Snackbar;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.CardView;
 import android.util.Log;
-import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import com.eissler.micha.hbgvertretungsapp.evaluation.CoverMessage;
-import com.eissler.micha.hbgvertretungsapp.evaluation.DataEvaluation;
-import com.eissler.micha.hbgvertretungsapp.evaluation.HBGMessage;
-import com.eissler.micha.hbgvertretungsapp.evaluation.HeaderMessage;
-import com.eissler.micha.hbgvertretungsapp.gcm.RegistrationIntentService;
 import com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity;
+import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
 import com.eissler.micha.hbgvertretungsapp.settings.WhitelistSubjects;
-import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Tracker;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.firebase.iid.FirebaseInstanceId;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
+import com.peracutor.hbgserverapi.DownloadException;
+import com.peracutor.hbgserverapi.HbgDataDownload;
 import com.viewpagerindicator.TitlePageIndicator;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
 import java.io.IOException;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.text.ParseException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
-import java.util.Map;
 
-import butterknife.ButterKnife;
 import hugo.weaving.DebugLog;
+import tr.xip.errorview.ErrorView;
 
-
-public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener, ActionMode.Callback, SwipeRefreshLayout.OnRefreshListener {
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemClickListener, SwipeRefreshLayout.OnRefreshListener {
 
     //Object-filename
     private final static String CLASSES = "ClassSelectionArrayAdapter";
 
+    public static final long REFRESH_COUNTDOWN_MILLIS = 5 * 60 * 1000;
 
-    //Preference-names
-    private static final String PREFERENCE = "MainPreference";
+    private ListView classesList;
+    private DrawerLayout drawerLayout;
 
-    //Preference-Keys
-    private final static String SELECTED_CLASS = "classSelection";
-    private final static String FIRST_START = "FirstStart";
-    private static final String VERSION = "version";
-    final static String LAST_UPDATE_CHECK = "LastUpdateCheck";
+    Preferences prefs;
+    public static boolean mainActivityPaused = true;
 
-    //private static final String REFRESH_DISPLAY_LIST = "RefreshDisplayList";
+    private ActionBarDrawerToggle drawerToggle;
+    private ViewPager pager;
+    private TitlePageIndicator titleIndicator;
+    private ErrorView errorView;
 
-    //RefreshSpinnerTask-Mode
-    private final static int GET_SAVE_STATE = 0;
-    private final static int REFRESH = 1;
+    private View.OnClickListener refreshOnClick;
 
-    private static final long REFRESH_COUNTDOWN_MILLIS = 60 * 1000;
+    public com.eissler.micha.hbgvertretungsapp.SwipeRefreshLayout swipeRefreshLayout;
+    private App.WaitFor<SwipeRefreshLayout> waitForSwipeRefreshLayout;
+    private Date lastReload;
+    private Integer currentItem;
+
+    private Snackbar refreshSnack;
 
     private final CountDownTimer refreshTimer = new CountDownTimer(REFRESH_COUNTDOWN_MILLIS, REFRESH_COUNTDOWN_MILLIS) {
         @Override
@@ -98,37 +89,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         @Override
         public void onFinish() {
             System.out.println("TIMER FINISHED");
-            swipeRefreshLayout.setRefreshing(true);
-            MainActivity.this.onRefresh();
+            showRefreshSnack();
         }
     };
-
-    //    private TextView selectedClassText;
-    private ListView classesList;
-    private DrawerLayout drawerLayout;
-
-    private ActionMode mActionMode;
-
-    private static boolean firstCreation = true; // TODO: 11.04.2016 firstcreation boolean
-
-    static SharedPreferences prefs;
-    public static SharedPreferences defaultPrefs;
-
-//    public static ProgressBar progressBar;
-
-    private ActionBarDrawerToggle drawerToggle;
-    private ViewPager pager;
-    private HbgPagerAdapter pagerAdapter;
-    private BroadcastReceiver mRegistrationBroadcastReceiver;
-    private TitlePageIndicator titleIndicator;
-    private CardView errorCard;
-    private TextView errorText;
-    private Tracker mTracker;
-
-    public com.eissler.micha.hbgvertretungsapp.SwipeRefreshLayout swipeRefreshLayout;
-    public static boolean mainActivityPaused = true;
-    private Date lastReload;
-    private Integer currentItem;
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
@@ -140,125 +103,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ButterKnife.bind(this);
         EventBus.getDefault().register(this);
+        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().permitAll().build());
 
-
-        // Obtain the shared Tracker instance.
-        HbgApplication application = (HbgApplication) getApplication();
-        mTracker = application.getDefaultTracker();
-
-        if (firstCreation) {
-            App.logTrace("First onCreate call");
-
-            prefs = getSharedPreferences(PREFERENCE, MODE_PRIVATE);
-            defaultPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-        }
-
-//        runOnUiThread(new Runnable() { // TODO: 10.04.2016 showcaseview
-//            @Override
-//            public void run() {
-//                new ShowcaseView.Builder(MainActivity.this)
-//                        .setTarget(new ViewTarget(listView))
-//                        .setContentText("This is the listview")
-//                        .setContentTitle("ListView")
-//                        .setStyle(R.style.HbgTheme)
-//                        .hideOnTouchOutside()
-//                        .setShowcaseEventListener(new OnShowcaseEventListener() {
-//                            @Override
-//                            public void onShowcaseViewHide(ShowcaseView showcaseView) {
-//
-//                            }
-//
-//                            @Override
-//                            public void onShowcaseViewDidHide(ShowcaseView showcaseView) {
-//
-//                            }
-//
-//                            @Override
-//                            public void onShowcaseViewShow(ShowcaseView showcaseView) {
-//
-//                            }
-//
-//                            @Override
-//                            public void onShowcaseViewTouchBlocked(MotionEvent motionEvent) {
-//
-//                            }
-//                        }).build();
-//            }
-//        });
-
-        try {
-            final int thisVersion = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
-            final boolean firstStart = prefs.getBoolean(FIRST_START, true);
-            if (firstStart) {
-
-
-                mRegistrationBroadcastReceiver = new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        System.out.println("RECEIVED!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-                        SharedPreferences sharedPreferences =
-                                PreferenceManager.getDefaultSharedPreferences(context);
-                        boolean sentToken = sharedPreferences
-                                .getBoolean(Preferences.SENT_TOKEN_TO_SERVER, false);
-                        if (sentToken) {
-                            Toast.makeText(MainActivity.this, "TOKEN WAS SENT", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(MainActivity.this, "WAS NOT SENT", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                };
-
-                // Registering BroadcastReceiver
-                registerReceiver();
-
-                Intent intent = new Intent(this, RegistrationIntentService.class);
-                intent.putStringArrayListExtra("topics", new ArrayList<>(Arrays.asList(new String[]{"21-GLaN3"})));
-                startService(intent); // TODO: 09.04.2016  do not register every time
-
-                SharedPreferences.Editor editor = prefs.edit();
-                editor.putBoolean(FIRST_START, false);
-                editor.putInt(VERSION, thisVersion);
-                editor.apply();
-
-                setAlarm(7, 0, 0, this);
-                setAlarm(19, 0, 1, this);
-
-
-
-//                App.dialog("Testphase", "Diese App ist in der Testphase und es können noch Fehler auftreten. Um diese zu beheben, wird, wenn ein Fehler auftritt, ein Fehlerbericht an mich gesendet. " +
-//                        "In den Einstellungen kannst du deine E-Mail-Adresse speichern, die allen Fehlerberichten angehängt wird, sodass ich dich erreichen kann, falls ich den Fehler, der bei dir aufgetreten ist, nicht durch den Fehlerbericht beheben kann.", MainActivity.this)
-//                        .setPositiveButton("Einstellungen", new DialogInterface.OnClickListener() {
-//                            @Override
-//                            public void onClick(DialogInterface dialog, int which) {
-//                                Intent settingsIntent = new Intent(MainActivity.this, SettingsActivity.class);
-//                                startActivity(settingsIntent);
-//                            }
-//                        })
-//                        .show();
-
-//                ACRA.getErrorReporter().handleSilentException(new Exception("App wurde das erste Mal gestartet")); // TODO: 18.04.2016 App wurde erstes mal gestartet - ACRA Meldung deaktiviert
-            } else if (thisVersion > prefs.getInt(VERSION, 1)) {
-                App.logCodeSection("Update was installed");
-                prefs.edit().putInt(VERSION, thisVersion).apply();
-//                ACRA.getErrorReporter().handleSilentException(new Exception("App-Update wurde installiert"));
-            }
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-        }
+        prefs = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, this);
 
 //        AccountManager accountManager = (AccountManager) getSystemService(Context.ACCOUNT_SERVICE);
 //        Account[] accounts = accountManager.getAccounts();
 //        for (Account acc : accounts) {
 //            System.out.println("acc.name = " + acc.name);
 //        }
+
+
 //        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 //        System.out.println("androidId = " + androidId); // TODO: 18.04.2016 maybe use this id
-
-        if (GooglePlayServicesUtil.isGooglePlayServicesAvailable(this) != ConnectionResult.SUCCESS) {
-            App.logError("GOOGLE PLAY SERVICES NOT AVAILABLE");
-        }
 
 
 //        Log.d(HbgApplication.HBG_APP, "onCreate MainActivity");
@@ -269,108 +127,34 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 //            System.out.println("getIntent().getDataString() = " + getIntent().getDataString());
 //        }
 
-//        WifiManager wifiMgr = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-//        WifiInfo wifiInfo = wifiMgr.getConnectionInfo(); // requires permission
-//        System.out.println("wifiInfo.getSSID() = " + wifiInfo.getSSID());
-//        System.out.println("wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED = " + wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED));
-
-        new RefreshSpinnerTask().execute(MainActivity.this, GET_SAVE_STATE);
-
-//        ArrayList<String> classesList; // TODO: 26.03.2016 implement this
-//        try {
-//            //noinspection unchecked
-//            classesList = (ArrayList<String>) App.retrieveObject(CLASSES, ArrayList.class, getApplicationContext());
-//            selectedClassText.setText(classesList.get(prefs.getInt(SELECTED_CLASS, 0)));
-//        } catch (IOException | ClassNotFoundException e) {
-//            App.logError("Could not retrieve saved classesList.");
-//            App.reportUnexpectedException(e);
-//            e.printStackTrace();
-//        }
-
-
-        App.logCodeSection("ViewAssignment");
-
-//        progressBar = (ProgressBar) findViewById(R.id.progressBar);
-
-        swipeRefreshLayout = (com.eissler.micha.hbgvertretungsapp.SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
-        assert swipeRefreshLayout != null;
-        swipeRefreshLayout.setColorSchemeResources(R.color.accent_material_light);
-        swipeRefreshLayout.setOnRefreshListener(this);
-
-        errorCard = (CardView) findViewById(R.id.error_card);
-        assert errorCard != null;
-        errorCard.setOnClickListener(new View.OnClickListener() {
+        refreshOnClick = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                swipeRefreshLayout.setRefreshing(true);
                 onRefresh();
-            }
-        });
-        errorText = (TextView) errorCard.findViewById(R.id.error_text);
-
-        classesList = (ListView) findViewById(R.id.left_drawer);
-
-        assert classesList != null;
-        classesList.setOnItemSelectedListener(this);
-        classesList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
-
-                MainActivity.this.classesList.requestFocusFromTouch();
-                MainActivity.this.classesList.setSelection(position);
-
-                String className = MainActivity.this.classesList.getItemAtPosition(position).toString();
-                if (!className.equals("Aktualisieren")) {
-                    drawerLayout.closeDrawers();
-                }
-
-                //noinspection ConstantConditions
-                getSupportActionBar().setSubtitle(className);
-
-            }
-        });
-
-        pager = (ViewPager) findViewById(R.id.view_pager);
-        onRefresh();
-        titleIndicator = (TitlePageIndicator) findViewById(R.id.titles);
-        assert titleIndicator != null;
-        titleIndicator.setViewPager(pager);
-
-
-        ViewPager.OnPageChangeListener onPageChangeListener = new ViewPager.OnPageChangeListener() {
-
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-            }
-
-            @Override
-            public void onPageSelected(final int position) {
-                App.logCodeSection("MainActivity.onPageSelected");
-                System.out.println("position = " + position);
-
-                EventBus.getDefault().post(new Event.LoadPermission(position));
-
-                if (mActionMode != null) {
-                    mActionMode.finish();
-                }
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-//                swipeRefreshLayout.setCanScrollUp(state != ViewPager.SCROLL_STATE_IDLE);
-                boolean pullDownAllowed = state == ViewPager.SCROLL_STATE_IDLE;
-
-                if (!pullDownAllowed) {
-                    System.out.println("Preventing Pulldown");
-                    EventBus.getDefault().post(new Event.CanScrollUp(true));
-                } else {
-                    EventBus.getDefault().post(new Event.CanScrollUpRequest());
-                }
             }
         };
 
-        titleIndicator.setOnPageChangeListener(onPageChangeListener);
+        refreshSnack = Snackbar.make(findViewById(android.R.id.content), "", Snackbar.LENGTH_SHORT)
+                .setAction(R.string.act_ma_refresh, refreshOnClick)
+                .setActionTextColor(Color.YELLOW)
+                .setDuration(5000);
 
+        App.logCodeSection("ViewAssignment");
+
+        System.out.println("token = " + FirebaseInstanceId.getInstance().getToken());
+
+        firstStartCheck();
+
+        setupSwipeRefreshLayout();
+        setupDrawer();
+        setupClassSelection();
+        setupPager();
+
+        updateCheck();
+        checkIntent(getIntent());
+    }
+
+    private void setupDrawer() {
         drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
 
         drawerToggle = new ActionBarDrawerToggle(
@@ -384,20 +168,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             /**
              * Called when a drawer has settled in a completely closed state.
              */
+            @Override
             public void onDrawerClosed(View view) {
                 super.onDrawerClosed(view);
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle(getResources().getString(R.string.app_name));
+                //noinspection ConstantConditions
+                getSupportActionBar().setTitle(getResources().getString(R.string.app_name));
+                //noinspection ConstantConditions
+                if (getSupportActionBar().getSubtitle().equals(getString(R.string.act_ma_choose_class))) {
+                    Toast.makeText(MainActivity.this, R.string.act_ma_choose_class, Toast.LENGTH_SHORT).show();
+                    drawerLayout.openDrawer(classesList);
                 }
             }
 
             /**
              * Called when a drawer has settled in a completely open state.
              */
+            @Override
             public void onDrawerOpened(View drawerView) {
                 super.onDrawerOpened(drawerView);
                 if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle("Klassenauswahl");
+                    getSupportActionBar().setTitle(R.string.act_ma_class_selection);
                 }
             }
         };
@@ -409,51 +199,134 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         getSupportActionBar().setHomeButtonEnabled(true);
 
         drawerToggle.syncState();
+    }
 
-//        selectedClassText.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                drawerLayout.openDrawer(GravityCompat.START);
-//            }
-//        });
+    private void setupPager() {
+        pager = (ViewPager) findViewById(R.id.view_pager);
+        titleIndicator = (TitlePageIndicator) findViewById(R.id.titles);
+        onRefresh();
+        titleIndicator.setViewPager(pager);
 
-        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().permitAll().build());
 
-        App.logCodeSection("LastUpdateCheck");
+        ViewPager.OnPageChangeListener onPageChangeListener = new ViewPager.OnPageChangeListener() {
+            private int position;
 
-        String lastUpdateCheckString = prefs.getString(LAST_UPDATE_CHECK, null);
-        App.logTrace("lastUpdateCheckString = " + lastUpdateCheckString);
-
-        if (lastUpdateCheckString == null) {
-            new CheckForUpdate(MainActivity.this);
-        } else {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY);
-            Date lastUpdate;
-
-            try {
-                lastUpdate = dateFormat.parse(lastUpdateCheckString);
-            } catch (ParseException e) {
-                App.reportUnexpectedException(e);
-                e.printStackTrace();
-                return;
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
             }
 
+            @Override
+            public void onPageSelected(final int position) {
+                this.position = position;
+                System.out.println("MainActivity.onPageSelected");
+                System.out.println("new page: position = " + position);
+
+                EventBus.getDefault().post(new Event.LoadPermission(position));
+                EventBus.getDefault().post(new Event.FinishActionMode());
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+                System.out.println("MainActivity.onPageScrollStateChanged");
+                boolean pullDownAllowed = state == ViewPager.SCROLL_STATE_IDLE;
+
+                if (!pullDownAllowed) {
+                    System.out.println("Preventing Pulldown");
+                    EventBus.getDefault().post(new Event.CanScrollUp(true));
+                } else {
+                    EventBus.getDefault().post(new Event.CanScrollUpRequest(position));
+                }
+            }
+        };
+
+        titleIndicator.setOnPageChangeListener(onPageChangeListener);
+    }
+
+    private void setupClassSelection() {
+        //noinspection ConstantConditions
+        getSupportActionBar().setSubtitle(getString(R.string.act_ma_loading_classes));
+        classesList = (ListView) findViewById(R.id.left_drawer);
+
+        assert classesList != null;
+        classesList.setOnItemClickListener(this);
+
+        prepareClassSelection(false);
+    }
+
+    @SuppressLint("PrivateResource")
+    private void setupSwipeRefreshLayout() {
+        swipeRefreshLayout = (com.eissler.micha.hbgvertretungsapp.SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
+        assert swipeRefreshLayout != null;
+        swipeRefreshLayout.setColorSchemeResources(R.color.accent_material_light);
+        swipeRefreshLayout.setOnRefreshListener(this);
+
+        if (waitForSwipeRefreshLayout != null) {
+            waitForSwipeRefreshLayout.onResult(swipeRefreshLayout);
+            waitForSwipeRefreshLayout = null;
+        }
+    }
+
+    private void firstStartCheck() {
+        try {
+            PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            final int thisVersion = packageInfo.versionCode;
+//            final String thisVersionName = packageInfo.versionName;
+            final boolean firstStart = prefs.getBoolean(Preferences.Key.FIRST_START, true);
+
+            if (firstStart) {
+                Preferences.Editor editor = prefs.edit();
+                editor.putBoolean(Preferences.Key.FIRST_START, false);
+                editor.putInt(Preferences.Key.VERSION, thisVersion);
+                editor.apply();
+
+                Notifications.newInstance(this).enable();
+
+
+//                ACRA.getErrorReporter().handleSilentException(new Exception("App wurde das erste Mal gestartet")); // TODO: 18.04.2016 App wurde erstes mal gestartet - ACRA Meldung deaktiviert
+            } else if (thisVersion > prefs.getInt(Preferences.Key.VERSION, 1)) {
+                App.logCodeSection("Update was installed");
+                prefs.edit().putInt(Preferences.Key.VERSION, thisVersion).apply();
+                InstallApk lastSavedApk = InstallApk.getLastSavedApk(this);
+                if (lastSavedApk.getVersion()== thisVersion && lastSavedApk.exists()) {
+                    lastSavedApk.deleteWithToast(this);
+                }
+//                ACRA.getErrorReporter().handleSilentException(new Exception("App-Update wurde installiert"));
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateCheck() {
+        String action = getIntent().getAction();
+        if (action != null && action.equals(App.ACTION_UPDATE)) {
+            return;
+        }
+
+        long lastUpdateMillis;
+        try {
+            lastUpdateMillis = prefs.getLong(Preferences.Key.LAST_UPDATE_CHECK, 0);
+        } catch (ClassCastException e) {
+            e.printStackTrace();
+            lastUpdateMillis = 0;
+        }
+        App.logTrace("lastUpdateMillis = " + lastUpdateMillis);
+
+        if (lastUpdateMillis == 0) {
+            new UpdateCheck(this);
+        } else {
             Calendar nextUpdateCal = Calendar.getInstance();
-            nextUpdateCal.setTime(lastUpdate);
-            nextUpdateCal.add(Calendar.DAY_OF_MONTH, 1);
+            nextUpdateCal.setTimeInMillis(lastUpdateMillis);
+            nextUpdateCal.add(Calendar.DAY_OF_MONTH, 2);
 
             if (new Date().after(nextUpdateCal.getTime())) {
-                new CheckForUpdate(MainActivity.this);
+                new UpdateCheck(this);
             }
         }
     }
 
-    private void registerReceiver() {
-//        if(!isReceiverRegistered) {
-        LocalBroadcastManager.getInstance(this).registerReceiver(mRegistrationBroadcastReceiver,
-                new IntentFilter(Preferences.REGISTRATION_COMPLETE));
-//            isReceiverRegistered = true;
-//        }
+    private void showRefreshSnack() {
+        refreshSnack.setText(getString(R.string.act_ma_last_reload) + new SimpleDateFormat("HH:mm", Locale.GERMANY).format(lastReload)).show();
     }
 
     @Override
@@ -468,23 +341,14 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onResume();
         mainActivityPaused = false;
 
-        mTracker.setScreenName("MainActivity");
-        mTracker.send(new HitBuilders.ScreenViewBuilder().build());
+//        mTracker.setScreenName("MainActivity");
+//        mTracker.send(new HitBuilders.ScreenViewBuilder().build());
 
         refreshTimer.start();
 
-//        if (WhitelistSubjects.isWhitelistModeActive()) {
-//            ArrayList<String> whiteListArray = WhitelistSubjects.getWhiteListArray(this);
-////            if (whiteListArray.size() == 0) {// TODO: 19.04.2016 finish here
-////
-////            }
-//        }
-
-
+        resetPager();
         if (App.isMillisecondsLater(lastReload, REFRESH_COUNTDOWN_MILLIS)) {
-            onRefresh();
-        } else {
-            resetPager();
+            showRefreshSnack();
         }
     }
 
@@ -494,44 +358,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         super.onPause();
         mainActivityPaused = true;
         refreshTimer.cancel();
-    }
-
-    public static void setAlarm(int hour, int minute, int requestCode, Context c) {
-
-        Intent alarmIntent = new Intent(c, AlarmReceiver.class);
-
-        AlarmManager alarmManager = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-
-        PendingIntent pendingAlarmIntent = PendingIntent.getBroadcast(c, requestCode, alarmIntent, 0);
-
-
-        Calendar calendar = Calendar.getInstance();
-
-        if (calendar.get(Calendar.HOUR_OF_DAY) > hour || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute)) {
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
-        }
-
-        calendar.set(Calendar.HOUR_OF_DAY, hour);
-        calendar.set(Calendar.MINUTE, minute);
-        calendar.set(Calendar.SECOND, 0);
-
-
-        alarmManager.setRepeating(AlarmManager.RTC, calendar.getTimeInMillis(), AlarmManager.INTERVAL_DAY
-                , pendingAlarmIntent);
-
-        System.out.println("Alarm " + requestCode + " was set: " + hour + ":" + minute);
-    }
-
-    public static void cancelAlarm(int requestCode, Context c) {
-        AlarmManager alarmManager = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-
-        Intent alarmIntent = new Intent(c, AlarmReceiver.class);
-        PendingIntent pendingAlarmIntent = PendingIntent.getBroadcast(c, requestCode, alarmIntent, 0);
-        alarmManager.cancel(pendingAlarmIntent);
-
-        System.out.println("Alarm " + requestCode + " cancelled.");
-        boolean alarmSet = PendingIntent.getBroadcast(c, requestCode, alarmIntent, PendingIntent.FLAG_NO_CREATE) != null;
-        System.out.println("alarm is set = " + alarmSet);
+        EventBus.getDefault().post(new Event.FinishActionMode());
     }
 
     @Override
@@ -552,49 +379,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         switch (menuItem.getItemId()) {
             case R.id.action_refresh:
-                swipeRefreshLayout.setRefreshing(true);
                 onRefresh();
-//
-////                LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-////                ImageView imageView = (ImageView) inflater.inflate(R.layout.refresh_action_view, null);
-////                Animation rotation = AnimationUtils.loadAnimation(this, R.anim.anim_refresh);
-////                rotation.setRepeatCount(Animation.INFINITE);
-////                imageView.startAnimation(rotation);
-////                menuItem.setActionView(imageView);
-//
-//                final ListView listView = pagerAdapter.getListView(pager.getCurrentItem());
-//
-//                listView.setAdapter(getLoadingAdapter(this));
-//
-//                if (classesList.getAdapter() == null) {
-//                    new RefreshSpinnerTask().execute(this, REFRESH);
-//                }
-//
-//                new Thread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        dataEvaluation = new DataEvaluation(MainActivity.this, true, pager.getCurrentItem());
-//                        final HbgListAdapter listAdapter = dataEvaluation.getFormattedListAdapter();
-//                        listView.post(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                listView.setAdapter(listAdapter);
-//                            }
-//                        });
-//
-////                        runOnUiThread(new Runnable() {
-////                            @Override
-////                            public void run() {
-////                                if (menuItem.getActionView() != null) {
-////                                    menuItem.getActionView().clearAnimation();
-////                                    menuItem.setActionView(null);
-////                                }
-////                            }
-////                        });
-//                    }
-//                }).start();
-
-
                 break;
             case R.id.action_settings:
                 Log.d(HbgApplication.HBG_APP, "Settings - Button clicked");
@@ -604,313 +389,91 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             case R.id.show_in_webbrowser:
                 Log.d(HbgApplication.HBG_APP, "Show in browser - Button clicked");
 
-                int weekNumber = DataEvaluation.getWeek(pager.getCurrentItem(), DataEvaluation.getCalendar(pager.getCurrentItem()));
-                int classNum = prefs.getInt(SELECTED_CLASS, 0);
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(DataEvaluation.makeURL(weekNumber, classNum)));
-                startActivity(browserIntent);
-
-                break;
-            default:
-                break;
-        }
-        return true;
-    }
-
-    AdapterView.OnItemClickListener tempOnItemClick;
-    ListView tempListView;
-
-    @Override
-    public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-        mode.getMenuInflater().inflate(R.menu.menu_cab, menu);
-        tempListView = pagerAdapter.getListView(pager.getCurrentItem());
-        tempOnItemClick = tempListView.getOnItemClickListener();
-
-
-        tempListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                App.logUserInput("List-Item at position " + position + " was clicked");
-                App.logCodeSection("Selection-OnItemClickListener");
-
-                HbgListAdapter listAdapter = (HbgListAdapter) tempListView.getAdapter();
-
-                String subject = listAdapter.getFieldOfList(position, CoverMessage.SUBJECT);
-                App.logTrace("subject = " + subject);
-                String newSubject = listAdapter.getFieldOfList(position, CoverMessage.NEW_SUBJECT);
-                App.logTrace("newSubject = " + newSubject);
-
-                if (!subject.equals("") && !newSubject.equals("") && !subject.equals(newSubject)) {
-                    return;
-                }
-
-                if (!listAdapter.isSelected(position)) {
-                    listAdapter.select(position, true);
-                    mActionMode.setTitle(String.valueOf(listAdapter.getNumberOfSelectedItems()));
-                    System.out.println("Selected item " + position);
+                if (HbgPagerAdapter.availableWeeks != null) {
+                    int weekNumber = HbgPagerAdapter.availableWeeks.get(pager.getCurrentItem());
+                    int classNum = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(HbgDataDownload.makeURL(weekNumber, classNum)));
+                    startActivity(browserIntent);
                 } else {
-                    listAdapter.deselect(position, true);
-                    mActionMode.setTitle(String.valueOf(listAdapter.getNumberOfSelectedItems()));
-                    System.out.println("Unselected item " + position);
-
+                    Toast.makeText(MainActivity.this, R.string.act_ma_no_week_selected, Toast.LENGTH_LONG).show();
                 }
 
-                if (!listAdapter.itemsSelected()) {
-                    System.out.println("No items selected");
-                    mActionMode.finish();
-                }
-            }
-        });
-        return true;
-
-    }
-
-    @Override
-    public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-        return false;
-    }
-
-    @Override
-    public boolean onActionItemClicked(final ActionMode mode, MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.item_delete:
-                final boolean whitelist_switch = defaultPrefs.getBoolean("whitelist_switch", false);
-                App.dialog("Bestätigen", "Sollen Meldungen zu den ausgewählten Fächern nicht mehr angezeigt werden?" + (whitelist_switch ? "\n\nAchtung, der Whitelist-Modus ist aktiv!" : ""), this)
-                        .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
-
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                final CustomNames customNames;
-
-                                final ListView listView = pagerAdapter.getListView(pager.getCurrentItem());
-                                final HbgListAdapter listAdapter;
-                                if (listView != null) {
-                                    listAdapter = (HbgListAdapter) listView.getAdapter();
-                                } else {
-                                    return;
-                                }
-
-
-                                try {
-                                    customNames = new CustomNames(getApplicationContext(), listAdapter.getNumberOfSelectedItems());
-                                } catch (Exception e) {
-                                    System.err.println("Error retrieving custom Names.");
-                                    App.reportUnexpectedException(e);
-                                    e.printStackTrace();
-                                    return;
-                                }
-
-                                System.out.println("Not showing following subjects anymore:");
-
-                                final ArrayList<String> whiteList = WhitelistSubjects.getWhiteListArray(MainActivity.this);
-
-                                for (int position : listAdapter.getSelectedItems()) {
-                                    String subject = listAdapter.getFieldOfList(position, CoverMessage.SUBJECT);
-                                    if (subject.equals("")) {
-                                        subject = listAdapter.getFieldOfList(position, CoverMessage.NEW_SUBJECT);
-                                    }
-
-                                    String originalSubject = null;
-
-                                    for (Map.Entry<String, String> entry : customNames.entrySet()) {
-                                        if (entry.getValue().equals(subject)) {
-                                            originalSubject = entry.getKey();
-                                        }
-                                    }
-                                    if (originalSubject == null) {
-                                        originalSubject = subject;
-                                    }
-
-                                    System.out.println(originalSubject);
-
-                                    if (whitelist_switch) {
-                                        assert whiteList != null;
-                                        for (int j = 0; j < whiteList.size(); j++) {
-                                            String whitelistedSubject = whiteList.get(j);
-                                            System.out.println("whitelistedSubject = " + whitelistedSubject);
-                                            if (whitelistedSubject.equals(originalSubject)) {
-                                                whiteList.remove(j);
-                                                break;
-                                            }
-                                        }
-                                    } else {
-                                        customNames.put(originalSubject, "Nicht anzeigen");
-                                    }
-                                }
-
-                                if (!whitelist_switch) {
-                                    customNames.save();
-                                } else {
-                                    assert whiteList != null;
-                                    WhitelistSubjects.saveWhiteListArray(whiteList, MainActivity.this);
-                                }
-
-                                resetPager();
-                                mode.finish();
-                            }
-                        })
-                        .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                mode.finish();
-                            }
-                        })
-                        .show();
-                return true;
+                break;
             default:
-                return false;
+                break;
         }
-    }
-
-    @Override
-    public void onDestroyActionMode(ActionMode mode) {
-        if (tempListView != null) {
-            System.out.println("TEMPONCLICK");
-            tempListView.setOnItemClickListener(tempOnItemClick);
-            ((HbgListAdapter) tempListView.getAdapter()).clearSelection(true);
-        }
-        tempOnItemClick = null;
-        tempListView = null;
-        mActionMode = null;
+        return true;
     }
 
     void resetPager() {
-        System.out.println("RESET PAGER");
-//        pagerAdapter.notifyDataSetChanged();
         EventBus.getDefault().post(new Event.ResetRequest());
     }
 
     @Subscribe
-    public void onListViewChange(final Event.ListViewChange listViewChange) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-
-                final ListView listView = listViewChange.getListView();
-                final HbgListAdapter listAdapter = (HbgListAdapter) listView.getAdapter();
-
-                AdapterView.OnItemClickListener onItemClickListener = new AdapterView.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                        App.logUserInput("List-Item at position " + position + " was clicked");
-                        App.logCodeSection("Default-OnItemClickListener");
-
-                        String subject = listAdapter.getFieldOfList(position, CoverMessage.SUBJECT);
-                        App.logTrace("subject = " + subject);
-
-                        String newSubject = listAdapter.getFieldOfList(position, CoverMessage.NEW_SUBJECT);
-                        App.logTrace("newSubject = " + newSubject);
-
-                        if (subject.equals("")) {
-                            subject = newSubject;
-                        }
-
-                        if (!subject.equals("") && !newSubject.equals("") && !subject.equals(newSubject)) {
-                            App.logTrace("Building OptionDialog");
-                            final CharSequence[] subjects = new CharSequence[]{subject, newSubject};
-                            new OptionDialogBuilder(MainActivity.this, subjects).getOptionDialog().show();
-                        } else {
-                            try {
-                                new FilterDialog(subject,
-                                        new FilterDialog.PostExecuteInterface() {
-                                            @Override
-                                            public void onPostExecute() {
-                                                MainActivity.this.resetPager();
-                                            }
-                                        },
-                                        MainActivity.this).show(); // FIXME: 25.03.2016 causes BadTokenException sometimes
-
-                            } catch (Exception e) {
-                                App.logError("FilterDialog konnte nicht angezeigt werden");
-                                App.reportUnexpectedException(e);
-                                e.printStackTrace();
-                                Toast.makeText(MainActivity.this, "Ein unerwarteter Fehler ist aufgetreten. Drücke den Aktualisieren-Button und versuche es erneut", Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                    }
-                };
-                listView.setOnItemClickListener(onItemClickListener);
-
-                listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-                    @Override
-                    public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                        App.logUserInput("List-Item at position " + position + " was long-clicked");
-                        App.logCodeSection("OnItemLongClickListener");
-
-                        if (mActionMode != null) {
-                            //noinspection ConstantConditions
-                            listView.getOnItemClickListener().onItemClick(parent, view, position, id);
-                            return true;
-                        }
-
-                        String subject = listAdapter.getFieldOfList(position, CoverMessage.SUBJECT);
-                        App.logTrace("subject = " + subject);
-                        String newSubject = listAdapter.getFieldOfList(position, CoverMessage.NEW_SUBJECT);
-                        App.logTrace("newSubject = " + newSubject);
-
-                        if (!subject.equals("") && !newSubject.equals("") && !subject.equals(newSubject)) {
-                            return false; // TODO: 28.03.2016 do not return but show OptionDialog
-                        }
-
-                        mActionMode = MainActivity.this.startActionMode(MainActivity.this);
-                        mActionMode.setTitle(String.valueOf(0));
-                        //noinspection ConstantConditions
-                        listView.getOnItemClickListener().onItemClick(parent, view, position, id);
-                        return true;
-                    }
-                });
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        swipeRefreshLayout.setRefreshing(false);
-                    }
-                });
-            }
-        }).start();
+    public void onError(Event.Exception exceptionEvent) {
+        showDefaultError(exceptionEvent.getException().getMessage());
     }
 
-    @Subscribe
-    public  void onEvaluationError(DataEvaluation.DataEvaluationException e) {
+    private void showDefaultError(String message) {
+        showError(message, getString(R.string.act_ma_refresh), refreshOnClick);
+    }
+
+    private void showError(String errorMessage, String buttonText, final View.OnClickListener onClickListener) {
+        System.out.println("MainActivity.showError");
         swipeRefreshLayout.setRefreshing(false);
         swipeRefreshLayout.setEnabled(false);
+        refreshTimer.cancel();
 
         titleIndicator.setVisibility(View.GONE);
+        if (errorView == null) {
+            errorView = (ErrorView) findViewById(R.id.error_view);
+        }
+        errorView.setVisibility(View.VISIBLE);
         pager.setVisibility(View.GONE);
 
-        errorCard.setVisibility(View.VISIBLE);
-        errorText.setText(String.format("%s\n\nKlicke hier zum Aktualisieren", e.getMessage()));
+        errorView.setSubtitle(errorMessage);
+        errorView.setRetryButtonText(buttonText);
+        errorView.setOnRetryListener(new ErrorView.RetryListener() {
+            @Override
+            public void onRetry() {
+                Toast.makeText(MainActivity.this, R.string.act_ma_refreshing, Toast.LENGTH_SHORT).show();
+                errorSolved();
+                onClickListener.onClick(null);
+            }
+        });
     }
 
-    private void hideErrorCard() {
+    private void errorSolved() {
+        refreshTimer.start();
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 swipeRefreshLayout.setEnabled(true);
                 titleIndicator.setVisibility(View.VISIBLE);
+                errorView.setVisibility(View.GONE);
                 pager.setVisibility(View.VISIBLE);
-                errorCard.setVisibility(View.GONE);
             }
         });
+    }
+
+    @Subscribe
+    public void onRefreshRequested(Event.RefreshRequest refreshRequest) {
+        onRefresh();
     }
 
     @DebugLog
     @Override
     public void onRefresh() {
-        if (errorCard.getVisibility() == View.VISIBLE) {
-            hideErrorCard();
-            Toast.makeText(MainActivity.this, "Aktualisiere...", Toast.LENGTH_SHORT).show();
+        if (refreshSnack.isShown()) {
+            refreshSnack.dismiss();
         }
-
-        if (mActionMode != null) {
-            mActionMode.finish();
-        }
+        EventBus.getDefault().post(new Event.FinishActionMode());
 
         if (!swipeRefreshLayout.isRefreshing()) swipeRefreshLayout.setRefreshing(true);
 
         currentItem = pager.getCurrentItem();
-        pagerAdapter = new HbgPagerAdapter(getSupportFragmentManager());
+        HbgPagerAdapter pagerAdapter = new HbgPagerAdapter(this);
         pager.setAdapter(pagerAdapter);
-        System.out.println("pager.getCurrentItem() = " + pager.getCurrentItem());
         pager.setCurrentItem(currentItem);
         currentItem = null;
 
@@ -918,10 +481,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         refreshTimer.cancel();
         refreshTimer.start();
 
-//        DataEvaluation.resetTempSaves();
-
-        if (classesList.getAdapter() == null) {
-            new RefreshSpinnerTask().execute(this, REFRESH);
+        if (classesList.getAdapter().getCount() < 10) {
+            prepareClassSelection(true);
         }
 //        swipeRefreshLayout.setRefreshing(false);
     }
@@ -933,210 +494,245 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     }
 
 
-    //--------------RefreshSpinnerTask--------------//
-    private class RefreshSpinnerTask extends AsyncTask<Object, Void, ArrayAdapter> {
-
-        private boolean badInternetConnection;
-        private boolean error;
-        private boolean noInternetConnection;
-
-        @Override
-        protected ArrayAdapter doInBackground(Object... params) {
-            App.logCodeSection("RefreshSpinnerTask");
-
-            ArrayList<String> classesList = null;
-            boolean couldNotRetrieve = false;
-            if (params[1] == GET_SAVE_STATE) {
-                App.logTrace("Getting save-state");
-                try {
-                    classesList = App.retrieveObject(CLASSES, getApplicationContext());
-                } catch (Exception e) {
-                    couldNotRetrieve = true;
-                    e.printStackTrace();
-                }
-                App.logTrace("couldNotRetrieve = " + couldNotRetrieve);
-            }
-
-            if (params[1] == REFRESH || couldNotRetrieve) {
-
-                classesList = downloadClassSelection();
-
-                App.logCodeSection("Create arrayAdapter");
-
-                if (classesList == null) {
-                    return null;
-                }
-
-                App.logInfo("Downloaded and saved class-selection.");
-            }
-
-            //noinspection ConstantConditions
-            ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(
-                    (Context) params[0],
-                    android.R.layout.simple_list_item_1,
-                    classesList);
-
-
-            arrayAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-
-
-            return arrayAdapter;
+    private void prepareClassSelection(boolean refresh) {
+        System.out.println("Prepare Class-Selection");
+        ArrayList<String> classes = null;
+        boolean error = false;
+        if (!refresh) try {
+            classes = App.retrieveObject(CLASSES, MainActivity.this);
+        } catch (IOException e) {
+            error = true;
+        } catch (ClassNotFoundException e) {
+            App.exitWithError(e);
+            return;
         }
 
-        protected void onPostExecute(ArrayAdapter aa) {
-            App.logCodeSection("Post RefreshSpinnerTask");
-
-            if (aa != null) {
-                classesList.setAdapter(aa);
-            } else {
-                App.logError("ArrayAdapter was null.");
-                if (noInternetConnection) {
-                    Toast.makeText(MainActivity.this, "Es besteht keine Internetverbindung", Toast.LENGTH_SHORT).show();
-                    return;
-                } else if (error) {
-                    Toast.makeText(MainActivity.this, "Fehler beim Herunterladen der Klassenauswahl", Toast.LENGTH_SHORT).show();
-                    return;
-                } else if (badInternetConnection) {
-                    Toast.makeText(MainActivity.this, "Internetverbindung konnte nicht hergestellt werden", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
-
-            int classSelection = prefs.getInt(SELECTED_CLASS, 0);
-            classesList.setSelection(classSelection);
-//            selectedClassText.setText(classesList.getItemAtPosition(classSelection).toString());
-
-            //noinspection ConstantConditions
-            getSupportActionBar().setSubtitle(classesList.getItemAtPosition(classSelection).toString());
-
-            App.logInfo("Spinner selection was set");
+        if (classes == null) {
+            error = true;
         }
 
-        private ArrayList<String> downloadClassSelection() {
-            App.logCodeSection("DownloadClassSelection");
-
-            String file;
-            try {
-                file = new Download(1024, MainActivity.this).connect("http://vp.hbgym.de/frames/navbar.htm", "downloading class-selection-list", 15000).dataToString().trim();
-            } catch (SocketTimeoutException | SocketException | UnknownHostException e) {
-                e.printStackTrace();
-                badInternetConnection = true;
-                return null;
-            } catch (IOException e) {
-                e.printStackTrace();
-                error = true;
-                return null;
-            } catch (InterruptedException e) {
-                //never thrown
-                return null;
-            } catch (Download.NoInternetConnectionException e) {
-                System.err.println(e.getMessage());
-                noInternetConnection = true;
-                return null;
-            }
-
-            App.logCodeSection("Filter classes");
-
-            int occ = file.indexOf("\"05a");
-            String[] seq = file.substring(occ, occ + 350).split(";", 2);
-            String[] classes = seq[0].split(",");
-
-            for (int i = 0; !classes[i].contains("]") && i < classes.length - 1; i++) {
-                classes[i] = classes[i].substring(1, classes[i].length() - 1);
-            }
-            classes[classes.length - 1] = classes[classes.length - 1].substring(1, classes[classes.length - 1].length() - 2);
-
-            App.logInfo("Classes filtered");
-
-            ArrayList<String> arrayListClasses = new ArrayList<>(Arrays.asList(classes));
-            arrayListClasses.add(0, "Wähle deine Klasse");
-            arrayListClasses.add("Aktualisieren");
-
-            try {
-                App.writeObject(arrayListClasses, CLASSES, getBaseContext());
-            } catch (Exception e) {
-                App.logError("Error writing object");
-                App.reportUnexpectedException(e);
-                e.printStackTrace();
-            }
-            return arrayListClasses;
+        if (!refresh && !error) {
+            setClasses(classes);
+            return;
         }
+
+
+
+
+        //refreshing:
+        setReloading();
+
+        if (!App.isConnected(this)) {
+            classListError(new DownloadException(DownloadException.ErrorType.NO_CONNECTION));
+            return;
+        }
+
+        Ion.with(this)
+                .load("http://vp.hbgym.de/frames/navbar.htm")
+                .noCache()
+                .asString(Charset.forName("ISO-8859-15"))
+                .setCallback(new FutureCallback<String>() {
+                    @Override
+                    public void onCompleted(Exception e, String html) {
+                        if (e != null) {
+                            classListError(DownloadException.getCorrespondingExceptionFor(e));
+                            return;
+                        }
+
+                        int occ = html.indexOf("\"05a");
+                        String[] seq = html.substring(occ, occ + 350).split(";", 2);
+                        String[] classes = seq[0].split(",");
+
+                        for (int i = 0; !classes[i].contains("]") && i < classes.length - 1; i++) {
+                            classes[i] = classes[i].substring(1, classes[i].length() - 1);
+                        }
+                        classes[classes.length - 1] = classes[classes.length - 1].substring(1, classes[classes.length - 1].length() - 2);
+
+                        ArrayList<String> downloadedClassList = new ArrayList<>(Arrays.asList(classes));
+                        downloadedClassList.add(0, getString(R.string.act_ma_choose_class));
+                        downloadedClassList.add(getString(R.string.act_ma_refresh));
+
+                        try {
+                            App.writeObject(downloadedClassList, CLASSES, getBaseContext());
+                        } catch (Exception e1) {
+                            App.logError("Error writing object");
+                            App.reportUnexpectedException(e1);
+                            e1.printStackTrace();
+                        }
+                        setClasses(downloadedClassList);
+                    }
+                });
     }
 
-    public void onNothingSelected(AdapterView<?> parent) {
+    private void setClasses(ArrayList<String> classes) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                MainActivity.this,
+                android.R.layout.simple_list_item_1,
+                classes);
+
+        classesList.setAdapter(adapter);
+
+        int classSelection = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
+        if (classSelection == 0) {
+            drawerLayout.openDrawer(classesList);
+        }
+        classesList.setSelection(classSelection);
+
+        //noinspection ConstantConditions
+        getSupportActionBar().setSubtitle(classesList.getItemAtPosition(classSelection).toString());
     }
 
+    private void classListError(DownloadException e) {
+        ArrayList<String> downloadedClassList = new ArrayList<>(2);
+        downloadedClassList.add(e.getMessage());
+        downloadedClassList.add("Aktualisieren");
 
-    public void onItemSelected(AdapterView<?> parent, View view, final int pos, long id) {
-        Log.d(HbgApplication.HBG_APP, "onItemSelected, position = " + pos);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                MainActivity.this,
+                android.R.layout.simple_list_item_1,
+                downloadedClassList);
 
-        if (mActionMode != null) {
-            mActionMode.finish();
+        classesList.setAdapter(adapter);
+    }
+
+    private void setReloading() {
+        classesList.setAdapter(new ArrayAdapter<>(
+                MainActivity.this,
+                android.R.layout.simple_list_item_1,
+                new String []{getString(R.string.act_ma_refreshing)}));
+    }
+
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
+        Log.d(HbgApplication.HBG_APP, "onItemSelected, position = " + position);
+        if (classesList.getAdapter().getCount() == 2 && position == 0) {
+            //error-string (first item) was selected - ignore
+            return;
         }
 
-        String className = classesList.getItemAtPosition(pos).toString();
+        EventBus.getDefault().post(new Event.FinishActionMode());
+
+        String className = classesList.getItemAtPosition(position).toString();
+        final int previousSelection = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
+        final boolean posChanged = position != previousSelection;
+
+        if (!className.equals(getString(R.string.act_ma_refresh))) {
+            if (!className.equals("Wähle deine Klasse")) drawerLayout.closeDrawers();
+            //noinspection ConstantConditions
+            getSupportActionBar().setSubtitle(className);
+        }
 
         if (className.equals("Aktualisieren")) {
-            System.out.println("Spinnertask3");
-            new RefreshSpinnerTask().execute(this, REFRESH);
-            return;
-        }
+            prepareClassSelection(true);
+        } else if (posChanged && Whitelist.isWhitelistModeActive(this)) {
+            final DialogInterface.OnClickListener listener;
+            App.dialog("Klassenauswahl", "Der Whitelist-Modus ist aktiv - eventuell solltest du die Fächer deiner Whitelist ändern!\n\nMöchtest du wirklich eine andere Klasse auswählen?", this)
+                    .setPositiveButton("Ja", listener = new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int which) {
+                            if (which == DialogInterface.BUTTON_NEGATIVE) {
+                                classesList.performItemClick(null, previousSelection, previousSelection);
+                                return;
+                            } else if (which == DialogInterface.BUTTON_NEUTRAL) {
+                                DialogInterface.OnClickListener listener2;
+                                App.dialog("Whitelist-Modus", "Möchtest du den Whitelist-Modus deaktivieren, oder die Fächer ändern?", MainActivity.this)
+                                        .setPositiveButton("Ändern", listener2 = new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialogInterface, int which) {
+                                                if (which == DialogInterface.BUTTON_POSITIVE) {
+                                                    startActivity(new Intent(MainActivity.this, WhitelistSubjects.class));
+                                                } else {
+                                                    Whitelist.enable(false, MainActivity.this);
+                                                    resetPager();
+                                                }
+                                            }
+                                        })
+                                        .setNegativeButton("Deaktivieren", listener2)
+                                        .show();
+                            }
 
-        if (pos == 0) {
-            ArrayList<HBGMessage> arrayList = new ArrayList<>(1);
-            arrayList.add(new HeaderMessage("Keine Klasse ausgewählt"));
-            HbgListAdapter arrayAdapter = new HbgListAdapter(this, arrayList);
-            final ListView listView = pagerAdapter.getListView(pager.getCurrentItem());
-            if (listView == null) {
-                return;
-            }
-            listView.setAdapter(arrayAdapter);
-            return;
-        }
-
-        final boolean posChanged = pos != prefs.getInt(SELECTED_CLASS, 0);
-
-        if (posChanged) {
-//            try {
-//                App.writeObject(null, DataEvaluation.SAVED_FILE, MainActivity.this);
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-
-            prefs.edit().putInt(SELECTED_CLASS, pos).apply();
+                            prefs.edit().putInt(Preferences.Key.SELECTED_CLASS, position).apply();
+                            onRefresh();
+                        }
+                    })
+                    .setNegativeButton("Nein", listener)
+                    .setNeutralButton("Whitelist ändern", listener)
+                    .show();
+        } else if (posChanged) {
+            prefs.edit().putInt(Preferences.Key.SELECTED_CLASS, position).apply();
             onRefresh();
         }
     }
 
-//    private void changeWeek(int week) {
-//        //listView.setAdapter(getLoadingAdapter());
-//
-//        if (dataEvaluation != null) {
-//            dataEvaluation.saveTempListAdapter(listAdapter);
-//            dataEvaluation.setWeek(week);
-//        }
+    @Override
+    protected void onNewIntent(Intent intent) {
+        checkIntent(intent);
+    }
+
+    private void checkIntent(Intent intent) {
+        System.out.println("MainActivity.checkIntent");
+        String action = intent.getAction();
+        if (action == null) {
+            return;
+        }
+        switch (action) {
+            case App.ACTION_UPDATE:
+                System.out.println("ACTION_UPDATE");
+                NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                notificationManager.cancel(intent.getIntExtra("id", -1));
+                new UpdateTask(intent.getIntExtra("versionNumber", -1), intent.getStringExtra("apkUrl") , this);
+                break;
+            case Intent.ACTION_VIEW:
+                System.out.println("ACTION_VIEW");
+                try {
+                    URL url = new URL(intent.getDataString());
+                    System.out.println("url = " + url);
+                    String path = url.getPath();
+                    boolean matches = path.matches("\\/w\\/[0-5][0-9]\\/w[0-9]{5}.htm");
+                    if (matches) {
+                        path = path.substring(1, path.lastIndexOf('.')); //remove prefix "/" and appendix ".htm"
+                        final int week = Integer.parseInt(path.substring(path.indexOf('/') + 1, path.lastIndexOf('/')));
+                        HbgPagerAdapter.getAvailableWeeks(new App.WaitFor<ArrayList<Integer>>() {
+                            @Override
+                            public void onResult(ArrayList<Integer> availablePages) {
+                                int index = availablePages.indexOf(week);
+                                if (index == -1) {
+                                    Toast.makeText(MainActivity.this, "Woche nicht verfügbar", Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                pager.setCurrentItem(index);
+                            }
+                        });
+
+                        final int classNumber = Integer.parseInt(path.substring(path.length() - 3));
+                        if (classNumber != prefs.getInt(Preferences.Key.SELECTED_CLASS, 0)) {
+                            //noinspection unchecked
+                            App.dialog("Link", "Der angeklickte Link ist für Klasse " + ((ArrayAdapter<String>) classesList.getAdapter()).getItem(classNumber) + ".\n\n" +
+                                    "Diese Klasse jetzt auswählen?", this)
+                                    .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialogInterface, int i) {
+                                            classesList.performItemClick(null, classNumber, classNumber);
+                                        }
+                                    })
+                                    .show();
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                break;
+        }
+    }
 
 
-//        HbgListAdapter savedListAdapter;
-//        if (dataEvaluation != null && (savedListAdapter = dataEvaluation.getSavedListAdapter()) != null) {
-//            listAdapter = savedListAdapter;
-//            listView.setAdapter(listAdapter);
-//        } else {
-//            final Context context = this;
-//            new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    dataEvaluation = new DataEvaluation(context, DataEvaluation.REFRESH);
-//                    listAdapter = dataEvaluation.getFormattedListAdapter();
-//                    listView.post(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            listView.setAdapter(listAdapter);
-//                        }
-//                    });
-//                }
-//            }).start();
-//        }
-//    }
+
+    public void waitForSwipeRefreshLayout(App.WaitFor<SwipeRefreshLayout> waitFor) {
+        if (swipeRefreshLayout != null) {
+            waitFor.onResult(swipeRefreshLayout);
+        } else {
+            waitForSwipeRefreshLayout = waitFor;
+        }
+    }
 }
 

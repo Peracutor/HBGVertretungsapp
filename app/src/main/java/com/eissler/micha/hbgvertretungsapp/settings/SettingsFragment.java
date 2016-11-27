@@ -1,226 +1,316 @@
 package com.eissler.micha.hbgvertretungsapp.settings;
 
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.preference.CheckBoxPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
+import android.widget.Toast;
 
+import com.eissler.micha.hbgvertretungsapp.AlarmReceiver;
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.BootReceiver;
-import com.eissler.micha.hbgvertretungsapp.CheckForUpdate;
 import com.eissler.micha.hbgvertretungsapp.HbgApplication;
-import com.eissler.micha.hbgvertretungsapp.MainActivity;
+import com.eissler.micha.hbgvertretungsapp.Notifications;
+import com.eissler.micha.hbgvertretungsapp.Preferences;
 import com.eissler.micha.hbgvertretungsapp.R;
-import com.mikepenz.aboutlibraries.Libs;
-import com.mikepenz.aboutlibraries.LibsBuilder;
-import com.orhanobut.logger.Logger;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
+import com.eissler.micha.hbgvertretungsapp.UpdateCheck;
+import com.eissler.micha.hbgvertretungsapp.fcm.PushNotifications;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.firebase.iid.FirebaseInstanceId;
 
 public class SettingsFragment extends PreferenceFragment {
 
-    final static String NOTIFICATION_SWITCH = "notification_switch";
-    final static String WHITELIST_SWITCH = "whitelist_switch";
-    public final static String ALARM_TIME_1 = "time_for_alarm_1";
-    public final static String ALARM_TIME_2 = "time_for_alarm_2";
-    final static String UPDATE = "update";
-    private static final String ABOUT = "about";
+    private final static String NOTIFICATION_SWITCH = "notification_switch";
+    private final static String WHITELIST_SWITCH = "whitelist_switch";
+    private final static String UPDATE = "update";
+    private final static String ALARM_TIME_1 = "time_for_alarm_1";
+    private final static String ALARM_TIME_2 = "time_for_alarm_2";
+//    private static final String ABOUT = "about";
+    private static final String PUSH_TEST = "push_test";
+    private static final String AUTO_NAME = "auto-name";
+    public static final String BATTERY_SAVER = "battery_saver";
+    public static final String ALARM_WAKE_UP = "alarm_wake_up";
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         addPreferencesFromResource(R.xml.preference_screen);
 
-
-        final Context context = getActivity();
-
-        final SharedPreferences defaultPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-
-
-
         final TimePreference timePreference1 = (TimePreference) findPreference(ALARM_TIME_1);
-
-        timePreference1.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-            @Override
-            public boolean onPreferenceChange(Preference preference, Object newValue) {
-                Log.d(HbgApplication.HBG_APP, "Set timePreference1");
-                setAlarm(0, (long) newValue);
-                return true;
-            }
-
-
-        });
-
         final TimePreference timePreference2 = (TimePreference) findPreference(ALARM_TIME_2);
 
-        timePreference2.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+        Preference.OnPreferenceChangeListener timePickerListener = new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
-                Log.d(HbgApplication.HBG_APP, "Set timePreference2");
-                setAlarm(1, (long) newValue);
+                Notifications.newInstance(getActivity()).reset(preference == timePreference1 ? Notifications.ALARM_1 : Notifications.ALARM_2, (long) newValue);
                 return true;
             }
+        };
+
+        timePreference1.setOnPreferenceChangeListener(timePickerListener);
+        timePreference2.setOnPreferenceChangeListener(timePickerListener);
 
 
-        });
-
-        final CheckBoxPreference notificationSwitch = (CheckBoxPreference) findPreference(NOTIFICATION_SWITCH);
-        boolean notifyBoolean = defaultPrefs.getBoolean(NOTIFICATION_SWITCH, true);
-        notificationSwitch.setSummary(notifyBoolean ? "An" : "Aus");
-        timePreference1.setEnabled(notifyBoolean);
-        timePreference2.setEnabled(notifyBoolean);
-
-        notificationSwitch.setChecked(notifyBoolean);
-
-        notificationSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+        findPreference(NOTIFICATION_SWITCH).setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
 
                 boolean switchedOn = (boolean) newValue;
+
                 Log.d(HbgApplication.HBG_APP, "Notifications toggled, they are now switched: " + (switchedOn ? "On" : "Off"));
-                //((TimePreference) newValue).getSummary();
 
-                MainActivity.defaultPrefs.edit().putBoolean(NOTIFICATION_SWITCH, switchedOn).apply();
-
-                timePreference1.setEnabled(switchedOn);
-                timePreference2.setEnabled(switchedOn);
-                preference.setSummary(switchedOn ? "An" : "Aus");
-
-                ComponentName receiver = new ComponentName(context, BootReceiver.class);
+                ComponentName receiver = new ComponentName(getActivity(), BootReceiver.class);
 
                 int state = switchedOn ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 
-                context.getPackageManager().setComponentEnabledSetting(receiver, state, PackageManager.DONT_KILL_APP);
+                getActivity().getPackageManager().setComponentEnabledSetting(receiver, state, PackageManager.DONT_KILL_APP);
 
-                if (!switchedOn) {
-                    MainActivity.cancelAlarm(0, context);
-                    MainActivity.cancelAlarm(1, context);
-                } else {
-
-
-                    Calendar calendar = Calendar.getInstance();
-                    SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.GERMANY);
-
-                    try {
-                        calendar.setTime(new Date(defaultPrefs.getLong(ALARM_TIME_1, sdf.parse("07:00").getTime())));
-                    } catch (ParseException e) {
-                        e.printStackTrace();
-                    }
-
-
-                    MainActivity.setAlarm(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), 0, context);
-
-                    try {
-                        calendar.setTime(new Date(defaultPrefs.getLong(ALARM_TIME_2, sdf.parse("19:00").getTime())));
-                    } catch (ParseException e) {
-                        e.printStackTrace();
-                    }
-
-                    MainActivity.setAlarm(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), 1, context);
-                }
+                Notifications.newInstance(getActivity()).enable(switchedOn);
                 return true;
             }
         });
 
+        final CheckBoxPreference pushSwitch = (CheckBoxPreference) findPreference(Preferences.Key.PUSH_NOTIFICATION_SWITCH.getKey());
+        final Preference pushTestPreference = findPreference(PUSH_TEST);
 
+        final int playServicesAvailable = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(getActivity());
+        if (playServicesAvailable != ConnectionResult.SUCCESS) {
+            pushSwitch.setEnabled(false);
+            pushSwitch.setSummary("Google Play Dienste nicht verfügbar");
+            pushTestPreference.setTitle("Google Play Dienste installieren");
+            pushTestPreference.setSummary("Google Play Dienste installieren/aktualisieren, um Push-Benachrichtigungen empfangen zu können.");
+            pushTestPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    GoogleApiAvailability.getInstance().getErrorDialog(getActivity(), playServicesAvailable, 20).show();
+                    return true;
+                }
+            });
+        } else {
+            pushSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(final Preference preference, Object newValue) {
+                    boolean switchedOn = (boolean) newValue;
+                    if (switchedOn) {
 
+                        AlertDialog.Builder dialog = App.dialog("Push-Benachrichtigungen", null, getActivity());
+
+                        final boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
+                        if (!whitelistModeActive) {
+                            dialog.setMessage("Um Push-Benachrichtungen zu erhalten, musst du den Whitelist-Modus aktivieren.")
+                                    .setPositiveButton("Verstanden", null)
+                                    .show();
+                            return false;
+                        } else {
+                            dialog.setMessage("Du bekommst nun immer schnellstmöglich die neuesten Vertretungsmeldungen der Woche vom App-Server gesendet. Immer Freitags um 19:00 Uhr wird auf die nächste Woche gewechselt.")
+                                    .setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                        @Override
+                                        public void onDismiss(DialogInterface dialogInterface) {
+                                            showTestPushDialog();
+                                        }
+                                    })
+                                    .show();
+
+                            PushNotifications.newInstance(getActivity()).activate();
+                        }
+                        return true;
+                    } else {
+                        PushNotifications.newInstance(getActivity()).deactivate();
+                    }
+                    return true;
+                }
+            });
+            pushTestPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    return showTestPushDialog();
+                }
+            });
+        }
+
+        final CheckBoxPreference whitelistSwitch = (CheckBoxPreference) findPreference(WHITELIST_SWITCH);
 
         final PreferenceScreen hiddenSubjects = (PreferenceScreen) findPreference("hidden_subjects");
         final PreferenceScreen whitelistSubjects = (PreferenceScreen) findPreference("whitelist_subjects");
-        final CheckBoxPreference whitelistSwitch = (CheckBoxPreference) findPreference(WHITELIST_SWITCH);
 
-        boolean whitelistBoolean = defaultPrefs.getBoolean(WHITELIST_SWITCH, true);
-        whitelistSwitch.setSummary(whitelistBoolean ? "An" : "Aus");
-        whitelistSwitch.setChecked(whitelistBoolean);
+        final boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
+//        whitelistSubjects.setEnabled(whitelistModeActive);
+        hiddenSubjects.setEnabled(!whitelistModeActive);
 
-        whitelistSubjects.setEnabled(whitelistBoolean);
-        hiddenSubjects.setEnabled(!whitelistBoolean);
-
-        whitelistSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+        final Preferences preferences = Preferences.getDefaultPreferences(getActivity());
+        whitelistSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() { // TODO: 18.09.2016 make sure MainActivity gets updated when changed
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 boolean switchedOn = (boolean) newValue;
-                ArrayList<String> whiteListArray = WhitelistSubjects.getWhiteListArray(context);
-                if (switchedOn && (whiteListArray == null || whiteListArray.size() < 8)) {
-                    String warning;
-                    if (whiteListArray == null || whiteListArray.size() == 0) {
-                        warning = "Es sind keine Fächer gespeichert, die angezeigt werden sollen!";
-                    } else if (whiteListArray.size() == 1) {
-                        warning = "Es ist nur 1 Fach gespeichert, das angezeigt werden soll!";
-                    } else {
-                        warning = "Es sind nur " + whiteListArray.size() + " Fächer gespeichert, die angezeigt werden sollen!";
-                    }
 
-                    App.dialog("Achtung!", warning + "\n\nWillst du zur Whitelist-Einstellungsseite wechseln?", context)
+
+
+//                Whitelist whitelist = Whitelist.get(getActivity());
+//                if (switchedOn && whitelist.size() < 8) {
+//                    String warning;
+//                    String format = "Es sind %s Fächer gespeichert, die angezeigt werden sollen!";
+//                    if (whitelist.size() == 0) {
+//                        warning = String.format(format, "keine");
+//                    } else if (whitelist.size() == 1) {
+//                        warning = "Es ist nur 1 Fach gespeichert, das angezeigt werden soll!";
+//                    } else {
+//                        warning = String.format(format, "nur " + whitelist.size());
+//                    }
+//
+//                    App.dialog("Achtung!", warning + "\n\nWillst du zur Whitelist-Einstellungsseite wechseln?", getActivity())
+//                        .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
+//                            @Override
+//                            public void onClick(DialogInterface dialog, int which) {
+//                                startActivity(new Intent(getActivity(), WhitelistSubjects.class));
+//                            }
+//                        })
+//                        .setNegativeButton("Nein", null)
+//                            .show();
+//                } else
+                if (switchedOn) {
+//                    Toast.makeText(getActivity(), "", Toast.LENGTH_LONG).show();
+                    startActivity(new Intent(getActivity(), WhitelistSubjects.class));
+                } else if (preferences.getBoolean(Preferences.Key.PUSH_NOTIFICATION_SWITCH, false)) {
+                    App.dialog("Achtung!", "Wenn du den Whitelist-Modus deaktivierst, wirst du keine Push-Benachrichtigungen mehr erhalten.\n\nTrotzdem deaktivieren?", getActivity())
                         .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-                                startActivity(new Intent(context, WhitelistSubjects.class));
+                                pushSwitch.setChecked(false);
+                                whitelistSwitch.setChecked(false);
+                                hiddenSubjects.setEnabled(true);
                             }
                         })
                         .setNegativeButton("Nein", null)
-                            .show();
+                        .show();
+                    return false;
                 }
-                Log.d(HbgApplication.HBG_APP, "Whitlist-mode toggled, is now switched: " + (switchedOn ? "On" : "Off"));
-
-                MainActivity.defaultPrefs.edit().putBoolean(WHITELIST_SWITCH, switchedOn).apply();
+                Log.d(HbgApplication.HBG_APP, "Whitelist-mode toggled, is now switched: " + (switchedOn ? "On" : "Off"));
 
                 hiddenSubjects.setEnabled(!switchedOn);
                 whitelistSubjects.setEnabled(switchedOn);
-                preference.setSummary(switchedOn ? "An" : "Aus");
 
                 return true;
             }
         });
 
+        findPreference(AUTO_NAME).setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                App.dialog("Automatische Fachbenennung",
+                        "Sollen alle Fächer deiner Whitelist, die du noch nicht selbst umbenannt hast, automatisch umbenannt werden? Alle Abkürzungen werden dabei ausgeschrieben (z.B. \"D\" zu \"Deutsch\", \"GGeN2\" zu \"Geschichte\").",
+                        getActivity())
+                        .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                int renamings = AutoName.autoNameWhitelist(getActivity());
+                                Toast.makeText(getActivity(), "Es wurden " + renamings + " Fächer umbenannt", Toast.LENGTH_LONG).show();
+                                getActivity().startActivity(new Intent(getActivity(), CustomNamesList.class));
+                            }
+                        })
+                        .setNegativeButton("Abbrechen", null)
+                        .show();
+                return true;
+            }
+        });
 
-        Preference updatePreference = findPreference(UPDATE);
-        updatePreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+        findPreference(UPDATE).setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(Preference preference) {
                 Log.d(HbgApplication.HBG_APP, "Check for Updates - Preference clicked");
-                new CheckForUpdate(getActivity());
+                new UpdateCheck(getActivity());
                 return true;
             }
         });
 
-        Preference aboutPref = findPreference(ABOUT);
-        aboutPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+        findPreference(ALARM_WAKE_UP).setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                Notifications.newInstance(getActivity()).enable(); // reset alarms to use the new alarm-type
+                return true;
+            }
+        });
+
+        findPreference(BATTERY_SAVER).setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(Preference preference) {
-                Logger.d("About Pref clicked");
-                new LibsBuilder()
-                        .withFields(R.string.class.getFields())
-                        .withActivityStyle(Libs.ActivityStyle.LIGHT_DARK_TOOLBAR)
-//                        .withActivityTheme(R.style.HbgTheme)
-                        .start(context);
-
+                showBatterySaverInfo();
                 return true;
             }
         });
+
+//        Preference aboutPref = findPreference(ABOUT);
+//        aboutPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+//            @Override
+//            public boolean onPreferenceClick(Preference preference) {
+//                new LibsBuilder() // TODO: 24.10.2016 about section
+//                        .withFields(R.string.class.getFields())
+//                        .withActivityStyle(Libs.ActivityStyle.LIGHT_DARK_TOOLBAR)
+////                        .withActivityTheme(R.style.HbgTheme)
+//                        .start(getActivity());
+//
+//                return true;
+//            }
+//        });
 
     }
 
-    private void setAlarm(int requestID, long millis) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date(millis));
+    private boolean showTestPushDialog() {
+        if (!App.isConnected(getActivity())) {
+            App.dialog("Keine Internetverbindung", "Stelle eine Internetverbindung her.", getActivity()).show();
+            return true;
+        }
+        App.dialog("Push-Benachrichtigung testen", "Soll eine Testbenachrichtigung an dich gesendet werden?\n\nSchließe die App, um zu sehen, ob du Nachrichten im Hintergrund empfangen kannst.", getActivity()) // TODO: 20.10.2016 Wortwahl
+                .setPositiveButton("Ja, testen", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+//                                new TestPushRequestProcessor(getActivity()).executeAsync(FirebaseInstanceId.getInstance().getToken());
+                        Toast.makeText(getActivity(), "In 30 Sekunden wird die Anfrage gesendet", Toast.LENGTH_LONG).show();
 
-        MainActivity.setAlarm(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), requestID, getActivity().getApplicationContext());
+                        AlarmManager alarmManager = (AlarmManager) getActivity().getSystemService(Context.ALARM_SERVICE);
+                        Intent intent = new Intent(getActivity(), AlarmReceiver.class);
+                        intent.setAction("alarm.request_test_push");
+                        intent.putExtra("token", FirebaseInstanceId.getInstance().getToken());
+                        PendingIntent pendingIntent = PendingIntent.getBroadcast(getActivity(), 3, intent, 0);
+                        alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 30 * 1000, pendingIntent);
+                    }
+                })
+                .setNegativeButton("Abbrechen", null)
+                .show();
+        return true;
+    }
+
+    private void showBatterySaverInfo() {
+
+//        final Preferences preferences = Preferences.getDefaultPreferences(getActivity());
+//        if (!preferences.getBoolean(Preferences.Key.SHOW_INFO, true)) {
+//            return;
+//        }
+        App.dialog("Energiespar-Apps",
+                "Falls du keine Benachrichtigungen von dieser App erhältst, kann das an einer Energiespar-App liegen, die Hintegrundprozesse automatisch beendet, um deinen Akku zu schonen. " +
+                        "Setze in diesem Fall die HBG-App auf die Liste der Apps, die nicht beendet werden sollen, um Benachrichtigungen zu erhalten.",
+                getActivity())
+                .setCancelable(false)
+                .setPositiveButton("Verstanden", null /*new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        preferences.edit().putBoolean(Preferences.Key.SHOW_INFO, false).apply();
+                    }
+                }*/)
+                .show();
     }
 
 }

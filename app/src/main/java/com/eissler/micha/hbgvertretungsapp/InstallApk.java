@@ -1,69 +1,83 @@
 package com.eissler.micha.hbgvertretungsapp;
 
+import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Environment;
-import android.support.v4.content.FileProvider;
-
-import org.json.JSONException;
-import org.json.JSONObject;
+import android.widget.Toast;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.Locale;
 
 /**
  * Created by Micha.
  * 10.05.2016
  */
-public class InstallApk {
+public class InstallApk extends File {
 
-    private String name;
-    private String versionName;
+    public static final String APK_NAME_FORMAT = "hbg-vertretungsapp-%d.apk";
+    private final Preferences preference;
 
-    public InstallApk(File apkFile, String versionName) {
-        this.versionName = versionName;
-        name = apkFile.getName();
+    private int version;
+
+    public InstallApk(int newVersion, Context context) {
+        super(getInstallApkDirectory(context), String.format(Locale.GERMANY, APK_NAME_FORMAT, newVersion));
+        version = newVersion;
+        preference = getPref(context);
     }
 
-    public InstallApk(String name, String newVersionName) {
-        this.name = name;
-        versionName = newVersionName;
+
+    private static Preferences getPref(Context context) {
+        return Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, context);
     }
 
-    public String getName() {
-        return name;
+    public static InstallApk getLastSavedApk(Context context) {
+        int version = -1;
+        try {
+            version = getPref(context).getInt(Preferences.Key.APK, -1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new InstallApk(version, context);
     }
 
-    public String getVersionName() {
-        return versionName;
+    public void save() {
+        preference.edit().putInt(Preferences.Key.APK, version).apply();
     }
 
-    public File getApkFile(Context context) {
-        return new File(getInstallApkDirectory(context), name);
+    public int getVersion() {
+        return version;
     }
 
-    private File getInstallApkDirectory(Context context) {
-        return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS); //context.getFilesDir(); //
+    private static File getInstallApkDirectory(Context context) {
+        return context.getFilesDir();
     }
 
-    public static InstallApk fromJsonString(String jsonString) throws JSONException {
-        return new InstallApk(jsonString);
+    public void deleteWithToast(Activity activity) {
+        boolean deleted = super.delete();
+
+        if (deleted) {
+            Toast.makeText(activity, R.string.act_ma_del_install_apk_success, Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(activity, R.string.act_ma_del_install_apk_failure, Toast.LENGTH_LONG).show();
+        }
     }
 
-    public String toJsonString() throws JSONException {
-        JSONObject json = new JSONObject();
-        json.put("name", name);
-        json.put("versionName", versionName);
-        return json.toString();
-    }
+    //    private InstallApk(String jsonString, Context context) throws JSONException {
+//        super(getInstallApkDirectory(context), new JSONObject(jsonString).getString("name"));
+//        JSONObject json = new JSONObject(jsonString);
+//        version = json.getInt("version");
+//        preference = getPref(context);
+//    }
 
-    private InstallApk(String jsonString) throws JSONException {
-        JSONObject json = new JSONObject(jsonString);
-        name = json.getString("name");
-        versionName = json.getString("versionName");
-    }
+//    private static InstallApk fromJsonString(String jsonString, Context context) throws JSONException {
+//        return new InstallApk(jsonString, context);
+//    }
+
+//    private String toJsonString() throws JSONException {
+//        JSONObject json = new JSONObject();
+//        json.put("name", name);
+//        json.put("version", version);
+//        return json.toString();
+//    }
 
 
 }

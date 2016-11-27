@@ -1,9 +1,14 @@
 package com.eissler.micha.hbgvertretungsapp;
 
 
+import android.app.Notification;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 
@@ -20,7 +25,7 @@ import java.util.Locale;
 
 public class App {
 
-    final static String CUSTOM_NAMES = "CustomNames";
+    public final static String CUSTOM_NAMES = "CustomNames";
 
     private static final String CODE_SECTION_REACHED = "CODE_SECTION_REACHED";
     private static final String ERROR = "ERROR";
@@ -31,13 +36,12 @@ public class App {
 
 
     public static final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
-    public static final SimpleDateFormat TIME_SDF = new SimpleDateFormat("HH:mm", Locale.GERMANY);
+//    public static final SimpleDateFormat TIME_SDF = new SimpleDateFormat("HH:mm", Locale.GERMANY);
     public static final SimpleDateFormat NORMAL_SDF = new SimpleDateFormat("dd.MM.yy", Locale.GERMANY);
     public static final SimpleDateFormat PRECISE_SDF = new SimpleDateFormat("EE HH:mm:ss dd.MM.yy", Locale.GERMANY);
     public static final SimpleDateFormat DAY_NAME_SDF = new SimpleDateFormat("EE", Locale.GERMANY);
 
-
-
+    public static final String ACTION_UPDATE = "ACTION_UPDATE";
 
 
     //----------read/write object to internal storage---------//
@@ -58,19 +62,17 @@ public class App {
         ois.close();
 
         if (object == null) {
-            throw new IOException("Retrieved Object was null."/* Expected: " + objectType.getClass().getName()*/);
+            System.err.print("Object retrieved for following name was null: " + filename);
+            return null;
+//            throw new IOException("Retrieved Object was null.");
         }
-
-//        if (!(objectType.getClass().isInstance(object))) {
-//            throw new ClassCastException("Object not of expected class.: '" + object.getClass() + "', expected '" + objectType.getClass() + "'");
-//        }
 
         //noinspection unchecked
         return (T) object;
     }
 
 
-    static public AlertDialog.Builder dialog(String title, String msg, Context activity){ return new AlertDialog.Builder(activity).setTitle(title).setMessage(msg).setPositiveButton("Ok", null); }
+    static public AlertDialog.Builder dialog(String title, CharSequence msg, Context activity){ return new AlertDialog.Builder(activity).setTitle(title).setMessage(msg).setPositiveButton("Ok", null); }
 
     public static void logCodeSection(String s) {
         Log.d(CODE_SECTION_REACHED, s);
@@ -113,10 +115,40 @@ public class App {
 
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
 
-        return (networkInfo != null && networkInfo.isConnected());
+        return networkInfo != null && networkInfo.isConnected();
     }
 
     public static boolean isMillisecondsLater(Date lastReload, long millisLater) {
         return new Date().getTime() - lastReload.getTime() > millisLater;
+    }
+
+    public static void exitWithError(Exception e) {
+        e.printStackTrace();
+        ACRA.getErrorReporter().handleException(e, true);
+    }
+
+    public static NotificationCompat.Builder getIntentNotificationBuilder(Context context) {
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0 /* Request code */, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT);
+
+        return getNotificationBuilder(context)
+                .setContentIntent(pendingIntent);
+    }
+
+    public static NotificationCompat.Builder getNotificationBuilder(Context context) {
+        return new NotificationCompat.Builder(context)
+                .setSmallIcon(R.mipmap.notification_icon)
+                .setAutoCancel(true)
+                .setDefaults(Notification.DEFAULT_VIBRATE)
+                .setLights(Color.RED, 2000, 2000)
+//                .setVibrate(new long[]{0,200,200,200})
+//                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                ;
+    }
+
+    public interface WaitFor<T> {
+        void onResult(T result);
     }
 }
