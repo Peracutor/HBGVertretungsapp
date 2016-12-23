@@ -21,7 +21,7 @@ public class SavedMessages {
     @SuppressWarnings("unused")
     private SavedMessages() {/*For Objectify*/}
 
-    public SavedMessages(SortedCoverMessages sortedCoverMessages, int classNumber) {
+    private SavedMessages(SortedCoverMessages sortedCoverMessages, int classNumber) {
         this.sortedCoverMessages = sortedCoverMessages;
         this.id = "Klasse_" + classNumber;
     }
@@ -30,7 +30,7 @@ public class SavedMessages {
         return sortedCoverMessages;
     }
 
-    public static SortedCoverMessages getForClass(int classNumber) {
+    public static SortedCoverMessages load(int classNumber) {
         SavedMessages saved = ofy().load().type(SavedMessages.class).id("Klasse_" + classNumber).now();
         SortedCoverMessages savedMessages;
         if (saved == null) {

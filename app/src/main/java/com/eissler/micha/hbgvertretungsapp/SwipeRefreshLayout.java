@@ -36,7 +36,6 @@ public class SwipeRefreshLayout extends android.support.v4.widget.SwipeRefreshLa
     @Subscribe
     public void setCanScrollUp(Event.CanScrollUp canScrollUpEvent) {
         canScrollUp = canScrollUpEvent.canScrollUp();
-        System.out.println("canScrollUp = " + canScrollUp);
     }
 
 }

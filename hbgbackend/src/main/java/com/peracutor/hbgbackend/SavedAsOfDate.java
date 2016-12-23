@@ -15,12 +15,14 @@ public class SavedAsOfDate {
     @Id
     String id;
     private long millis;
+    private int weekNumber;
 
     @SuppressWarnings("unused")
     private SavedAsOfDate() {/*For Objectify*/}
 
-    public SavedAsOfDate(Date date, String id) {
+    public SavedAsOfDate(Date date, int weekNumber, String id) {
         millis = date.getTime();
+        this.weekNumber = weekNumber;
         this.id = id;
     }
 
@@ -28,4 +30,7 @@ public class SavedAsOfDate {
         return new Date(millis);
     }
 
+    public int getWeekNumber() {
+        return weekNumber;
+    }
 }

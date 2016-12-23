@@ -10,7 +10,8 @@ import android.support.v4.app.NotificationCompat;
 
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.MainActivity;
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.RequestCodes;
 import com.eissler.micha.hbgvertretungsapp.TestPushRequestProcessor;
 import com.google.firebase.messaging.RemoteMessage;
 import com.koushikdutta.ion.Ion;
@@ -21,7 +22,7 @@ import java.util.Map;
  * Created by Micha.
  * 25.08.2016
  */
-public class NotificationProcessor extends ProcessorDistributor.Processor<RemoteMessage> {
+public class PushNotificationProcessor extends ProcessorDistributor.Processor<RemoteMessage> {
 
     @Override
     public String getAction() {
@@ -34,8 +35,11 @@ public class NotificationProcessor extends ProcessorDistributor.Processor<Remote
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(TestPushRequestProcessor.getFailedPendingIntent(getContext()));
 
-        System.out.println("NotificationProcessor.process");
+        System.out.println("PushNotificationProcessor.process");
         Map<String, String> data = remoteMessage.getData();
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            data.put(entry.getKey(), replaceUmlaute(entry.getValue()));
+        }
 
         final String title = data.get("title");
         final String body = data.get("body");
@@ -49,11 +53,11 @@ public class NotificationProcessor extends ProcessorDistributor.Processor<Remote
         backIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         Intent intent = new Intent(getContext(), NotificationViewActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         intent.putExtra("title", title)
                 .putExtra("body", body)
                 .putExtra("imageUrl", imageUrl);
-        PendingIntent pendingIntent = PendingIntent.getActivities(getContext(), 0 /* Request code */, new Intent[]{backIntent, intent}, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getActivities(getContext(), RequestCodes.ACTIVITY_OPEN_NOTIFICATION, new Intent[]{backIntent, intent}, PendingIntent.FLAG_UPDATE_CURRENT);
 
         final NotificationCompat.Builder notificationBuilder = App.getNotificationBuilder(getContext())
                 .setContentTitle(title)
@@ -71,15 +75,20 @@ public class NotificationProcessor extends ProcessorDistributor.Processor<Remote
             System.out.println("Image downloaded");
 
             notificationBuilder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(bitmap).setSummaryText(body));
-            notificationManager.notify(5 /* ID of notification */, notificationBuilder.build());
-            //                            termination.countDown();
+            notificationManager.notify(RequestCodes.NOTIFICATION_PUSH, notificationBuilder.build());
             return;
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         notificationBuilder.setStyle(new NotificationCompat.BigTextStyle().bigText(body));
-        notificationManager.notify(5 /* ID of notification */, notificationBuilder.build());
+        notificationManager.notify(RequestCodes.ALARM_REQUEST_TEST_PUSH, notificationBuilder.build());
+    }
+
+    private static String replaceUmlaute(String s) {
+        return s.replace("ae", "ä").replace("ue", "ü").replace("oe", "ö")
+                .replace("Ae", "Ä").replace("Ue", "Ü").replace("Oe", "Ö")
+                .replace("s_z", "ß");
     }
 
 

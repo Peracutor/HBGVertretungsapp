@@ -27,7 +27,7 @@
             android:title="Push-Benachrichtigungen"
             android:key="push_notifications"
             android:defaultValue="false"
-            android:summary="Erhalte Benachrichtigungen bei neuen Meldungen zu deiner Whitelist"
+            android:summary="Erhalte Benachrichtigungen bei neuen Meldungen"
             android:widgetLayout="@layout/switch_compat"
             />
 
@@ -65,11 +65,23 @@
             <intent android:action="com.eissler.micha.hbgvertretungsapp.WhitelistSubjects" />
         </PreferenceScreen>
 
-        <Preference
-            android:title="Automatische Fachbenennung"
-            android:summary="Whitelist-Fächer automatisch umbenennen lassen"
-            android:key="auto-name"
-            android:dependency="whitelist_switch" />
+        <CheckBoxPreference
+            android:title="Fachkürzel ausschreiben"
+            android:key="auto_name_subjects"
+            android:defaultValue="false"
+            android:summary="Kürzel der Fächer werden automatisch ausgeschrieben"
+            android:widgetLayout="@layout/switch_compat"
+            />
+
+        <com.eissler.micha.hbgvertretungsapp.settings.ShowableListPreference
+            android:title="Wie werden Oberstufenkürzel ausgeschrieben?"
+            android:key="auto_name_pattern"
+            android:defaultValue="*f"
+            android:entries="@array/auto_name_pattern_entry_list"
+            android:entryValues="@array/auto_name_pattern_list"
+            android:summary="Das Muster, nach dem die Fachkürzel automatisch ausgeschrieben werden"
+            android:dependency="auto_name_subjects"
+            />
 
     </PreferenceCategory>
 

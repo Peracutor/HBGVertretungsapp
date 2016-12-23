@@ -51,9 +51,26 @@
     <string name="act_ma_del_install_apk_success">Installationsdatei erfolgreich gelöscht</string>
     <string name="act_ma_del_install_apk_failure">Installationsdatei konnte nicht gelöscht werden</string>
     <string name="act_ma_last_reload">"Letzte Aktualisierung: "</string>
-    <string name="act_ma_no_week_selected">Es ist keine Woche ausgewählt!</string>
+    <string name="act_ma_open_in_browser">Wird im Browser geöffnet…</string>
     <string name="act_ma_refreshing">Aktualisiere…</string>
     <string name="act_ma_refresh">Aktualisieren</string>
     <string name="global_error">Ups…</string>
+    <string name="room_text">Raum</string>
+
+
+    <array name="auto_name_pattern_list">
+        <item>*f</item>
+        <item>*f *k*n</item>
+        <item>*k *f</item>
+        <item>*f (*k*n)</item>
+    </array>
+    <array name="auto_name_pattern_entry_list"> <!--todo mark as examples for the pattern-->
+        <item>Erdkunde</item>
+        <item>Erdkunde LK2</item>
+        <item>LK Erdkunde</item>
+        <item>Benutzerdefiniert</item>
+    </array>
+
+
 
 </resources>

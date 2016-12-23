@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.widget.Toast;
 
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+
 import java.io.File;
 import java.util.Locale;
 

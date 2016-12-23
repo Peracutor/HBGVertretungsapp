@@ -6,7 +6,6 @@ import org.jsoup.select.Elements;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 
 /**
  * Created by Micha.
@@ -19,6 +18,10 @@ public class HbgAvailableWeeksDownload extends HbgDownload<ArrayList<Integer>> {
 
     public HbgAvailableWeeksDownload() {
         super(HBG_NAVBAR_URL);
+    }
+
+    public HbgAvailableWeeksDownload(HtmlDownloadHandler downloadHandler) {
+        super(HBG_NAVBAR_URL, downloadHandler);
     }
 
     @Override
@@ -49,7 +52,6 @@ public class HbgAvailableWeeksDownload extends HbgDownload<ArrayList<Integer>> {
             }
             availableWeeks.add(weekNumber);
         }
-        Collections.sort(availableWeeks);
         return availableWeeks;
     }
 }

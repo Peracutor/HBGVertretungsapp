@@ -7,27 +7,48 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
+import android.support.annotation.NonNull;
 import android.support.v4.app.NotificationCompat;
 
-import com.eissler.micha.hbgvertretungsapp.evaluation.CustomNameReplacer;
-import com.eissler.micha.hbgvertretungsapp.evaluation.HbgDownload;
+import com.eissler.micha.hbgvertretungsapp.evaluation.DownloadHandler;
+import com.eissler.micha.hbgvertretungsapp.util.PreferenceExponentialBackoff;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.peracutor.hbgserverapi.CoverMessage;
-import com.peracutor.hbgserverapi.DownloadException;
 import com.peracutor.hbgserverapi.HBGMessage;
 import com.peracutor.hbgserverapi.HbgDataDownload;
-import com.peracutor.hbgserverapi.ResultCallback;
+import com.peracutor.hbgserverapi.ReplacedCoverMessage;
 import com.peracutor.hbgserverapi.SortedCoverMessages;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
+import static com.eissler.micha.hbgvertretungsapp.util.Preferences.Key.NOTIFICATION_SERVICE_BACKOFF;
+
 public class NotificationService extends IntentService {
+
+    private final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
 
     private CountDownLatch termination;
 
     public NotificationService(){
         super("NotificationService");
+    }
+
+    public static Calendar getDayToNotify() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 12);
+        calendar.set(Calendar.MINUTE, 0);
+
+        if (new Date().after(calendar.getTime())) {
+            calendar.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        System.out.println("dayToNotify= " + calendar.get(Calendar.DAY_OF_WEEK));
+        return calendar;
     }
 
     @SuppressLint("SwitchIntDef")
@@ -41,13 +62,13 @@ public class NotificationService extends IntentService {
 
         switch (dayInWeek) {
             case Calendar.FRIDAY:
-                execute(HbgDataDownload.getDayToNotify().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY);
+                execute(getDayToNotify().get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY);
                 break;
             case Calendar.SATURDAY:
                 terminate();
                 break;
             case Calendar.SUNDAY:
-                execute(HbgDataDownload.getDayToNotify().get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY);
+                execute(getDayToNotify().get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY);
                 break;
             default:
                 execute(true);
@@ -67,72 +88,59 @@ public class NotificationService extends IntentService {
             terminate();
             return;
         }
-
-        if (!App.isConnected(this)) {
-            showNotification(makeBuilder(new DownloadException(DownloadException.ErrorType.NO_CONNECTION).getMessage()));
+        SortedCoverMessages sortedCoverMessages;
+        try {
+            sortedCoverMessages = new HbgDataDownload(App.getSelectedClass(this), getDayToNotify().get(Calendar.WEEK_OF_YEAR), new DownloadHandler(this)).executeSync();
+        } catch (Exception e) {
+            e.printStackTrace();
+            PreferenceExponentialBackoff backoff = getBackoff();
+            if (backoff.retry()) {
+                AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + backoff.getValue(), Notifications.newInstance(NotificationService.this).getAlarmPendingIntent(RequestCodes.ALARM_NO_INTERNET_BACKOFF));
+                terminate();
+            } else {
+                backoff.reset();
+                showNotification(App.getIntentNotificationBuilder(this)
+                        .setContentText(e.getMessage()));
+            }
             return;
         }
 
-        new HbgDownload(HbgDownload.getDayToNotify().get(Calendar.WEEK_OF_YEAR), this).executeAsync(new ResultCallback<SortedCoverMessages>() {
-            @Override
-            public void onResult(SortedCoverMessages sortedCoverMessages) {
-                System.out.println("onDownloadCompleted");
-                System.out.println("sortedCoverMessages = " + sortedCoverMessages);
-
-                ExponentialBackoff backoff = new NotificationServiceBackoff(NotificationService.this);
-
-                backoff.reset();
-                if (sortedCoverMessages == null) {
+        PreferenceExponentialBackoff backoff = getBackoff();
+        backoff.reset();
+        if (sortedCoverMessages == null) {
 //                    showNotification(getNoDataBuilder());
-                    return;
-                }
+            return;
+        }
 
-                NotificationCompat.Builder builder = formatMessagesForNotification(sortedCoverMessages, NotificationService.this);
-                if (builder == null) {
-                    System.out.println("No data");
+        NotificationCompat.Builder builder = formatMessagesForNotification(sortedCoverMessages);
+        if (builder == null) {
+            System.out.println("No data");
 //                    builder = getNoDataBuilder(); //no data for the day to notify about available
-                    return;
-                }
+            return;
+        }
 
-                showNotification(builder);
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                e.printStackTrace();
-                ExponentialBackoff backoff = new NotificationServiceBackoff(NotificationService.this);
-                if (backoff.retry()) {
-                    AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-                    alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + backoff.getValue(), Notifications.newInstance(NotificationService.this).getAlarmPendingIntent(47)); // TODO: 15.09.2016 check all request codes
-                    terminate();
-                } else {
-                    backoff.reset();
-                    showNotification(makeBuilder(e.getMessage()));
-                }
-            }
-        });
+        showNotification(builder);
     }
+
+
 
 //    private NotificationCompat.Builder getNoDataBuilder() {
-//        return makeBuilder("Keine Vertretungsdaten");
+//        return App.getIntentNotificationBuilder(this)
+//                  .setContentText("Keine Vertretungsdaten");
 //    }
-
-    private NotificationCompat.Builder makeBuilder(String contentText) {
-        return App.getIntentNotificationBuilder(this)
-                .setContentText(contentText);
-    }
 
     private void showNotification(NotificationCompat.Builder builder) {
         System.out.println("showNotification");
         System.out.println("builder.mContentText = " + builder.mContentText);
         if (builder.mContentTitle == null) {
-            String dateToNotify = App.SHORT_SDF.format(HbgDataDownload.getDayToNotify().getTime());
+            String dateToNotify = sdf.format(getDayToNotify().getTime());
             builder.setContentTitle("Meldungen für den " + dateToNotify);
         }
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        notificationManager.notify(1, builder.build());
+        notificationManager.notify(RequestCodes.NOTIFICATION_PULL, builder.build());
         System.out.println("SERVICE FINISHED");
         terminate();
     }
@@ -143,16 +151,16 @@ public class NotificationService extends IntentService {
         stopSelf();
     }
 
-    public NotificationCompat.Builder formatMessagesForNotification(SortedCoverMessages sortedCoverMessages, Context context) {
+    public NotificationCompat.Builder formatMessagesForNotification(SortedCoverMessages sortedCoverMessages) {
 
-        String dateToNotify = App.SHORT_SDF.format(HbgDataDownload.getDayToNotify().getTime());
-        ArrayList<CoverMessage> dayMessages = sortedCoverMessages.getMessagesForDay(dateToNotify, new CustomNameReplacer(context));
+        String dateToNotify = sdf.format(getDayToNotify().getTime());
+        ArrayList<ReplacedCoverMessage> dayMessages = sortedCoverMessages.getMessagesForDay(dateToNotify, App.getCoverMessageFilter(this), App.getReplacer(this));
         if (dayMessages.size() == 0) {
             return null;
         }
 
         int thisDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
-        int notifyDay = HbgDataDownload.getDayToNotify().get(Calendar.DAY_OF_WEEK);
+        int notifyDay = getDayToNotify().get(Calendar.DAY_OF_WEEK);
         String todayOrTomorrow = thisDay == notifyDay ? "heute" :
                 thisDay == notifyDay - 1 ? "morgen" : "";
 
@@ -160,7 +168,7 @@ public class NotificationService extends IntentService {
 
         NotificationCompat.InboxStyle inboxStyle = formatToInbox(dayMessages, "", summary);
 
-        return App.getIntentNotificationBuilder(context)
+        return App.getIntentNotificationBuilder(this)
                 .setContentTitle("Meldungen für den " + dateToNotify)
                 .setContentText(dayMessages.size() == 0 ? "Keine Vertretungsmeldungen" : dayMessages.get(0) + (dayMessages.size() > 1 ? " (+" + (dayMessages.size() - 1) + " weitere)" : ""))
                 .setStyle(inboxStyle);
@@ -208,29 +216,9 @@ public class NotificationService extends IntentService {
 //        String getSummaryLimitExceeded(int messageCount, int exceededBy);
 //    }
 
-    private static class NotificationServiceBackoff extends ExponentialBackoff {
-
-        public static final int START_VALUE = 15 * 1000;
-        public static final int MAX_RETRIES = 3;
-
-        public NotificationServiceBackoff(Context context) {
-            super(context);
-        }
-
-        @Override
-        protected Preferences.Key getPreferenceName() {
-            return Preferences.Key.NOTIFICATION_SERVICE_BACKOFF;
-        }
-
-        @Override
-        protected long getStartValue() {
-            return START_VALUE;
-        }
-
-        @Override
-        protected int getMaxRetries() {
-            return MAX_RETRIES;
-        }
+    @NonNull
+    private PreferenceExponentialBackoff getBackoff() {
+        return new PreferenceExponentialBackoff(15 * 1000, 2, 3, NOTIFICATION_SERVICE_BACKOFF.getKey(), Preferences.getDefaultPreferences(NotificationService.this));
     }
 
 

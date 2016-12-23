@@ -3,6 +3,7 @@ package com.eissler.micha.hbgvertretungsapp;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,8 +12,11 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.eissler.micha.hbgvertretungsapp.settings.AutoName;
+import com.eissler.micha.hbgvertretungsapp.settings.Blacklist;
 import com.eissler.micha.hbgvertretungsapp.settings.CustomNames;
 import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
+import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
 
 import java.util.Map;
 
@@ -25,15 +29,11 @@ public class FilterDialog {
     private final InputMethodManager inputManager;
     private String errorText;
 
-    public FilterDialog(String subject, PostExecuteInterface postExecuteInterface, Context context) {
-        this(subject, null, postExecuteInterface, context);
+    public FilterDialog(String originalSubject, @Nullable String customName, Context context, Runnable postExecute) {
+        this(originalSubject, customName, null, context, postExecute);
     }
 
-    public FilterDialog(String subject, CustomNames customNames, PostExecuteInterface postExecuteInterface, Context context) {
-        this(subject, null, customNames, postExecuteInterface, context);
-    }
-
-    public FilterDialog(String subject, String originalSubject, CustomNames customNames, final PostExecuteInterface postExecuteInterface, final Context context) {
+    public FilterDialog(String originalSubject, @Nullable String customName, @Nullable CustomNames customNames, final Context context, final Runnable postExecute) {
 
         inputManager = ((InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE));
 
@@ -57,23 +57,26 @@ public class FilterDialog {
         if (customNames == null) {
             customNames = CustomNames.get(context);
         }
-
         final CustomNames customNamesFinal = customNames;
 
-        if (originalSubject == null) {
-            originalSubject = getOriginalSubject(subject, customNamesFinal);
+        if (customName == null) {
+            customName = customNames.get(originalSubject);
+            if (customName == null) {
+                customName = originalSubject;
+            }
         }
 
-        if (subject.equals("Nicht anzeigen")) {
+
+        final Blacklist blacklist = Blacklist.get(context);
+        if (blacklist.contains(originalSubject)) {
             checkBox.setChecked(true);
             kursName.setEnabled(false);
 
-            subject = originalSubject;
+//            customName = originalSubject;
         }
 
-        final String finalSubject = subject;
-        kursName.setText(finalSubject);
-        kursName.setSelection(finalSubject.length());
+        kursName.setText(customName);
+        kursName.setSelection(customName.length());
 
         editTextLabel.setText(String.format(DISPLAY_NAME, originalSubject));
 
@@ -96,17 +99,20 @@ public class FilterDialog {
         });
 
         final String originalSubject_final = originalSubject;
-        final String oldName = customNamesFinal.get(originalSubject_final) == null ? originalSubject : customNamesFinal.get(originalSubject_final);
+        final String oldName;
+        if (customNamesFinal.get(originalSubject_final) == null) {
+            oldName = AutoName.isAutoNamingEnabled(context) ? new AutoName(context).getAutoName(originalSubject) : originalSubject;
+        } else {
+            oldName = customNamesFinal.get(originalSubject_final);
+        }
 
-        builder.setPositiveButton("Speichern", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String displayName = kursName.getText().toString();
+        builder.setPositiveButton("Speichern", (dialog, which) -> {
+            String displayName = kursName.getText().toString();
 
-                if (checkBox.isChecked()) {
-                    displayName = "Nicht anzeigen";
-                }
-
+            if (checkBox.isChecked()) {
+                blacklist.add(originalSubject_final);
+                blacklist.save();
+            } else {
                 if (displayName.equals(oldName)) {
                     return;
                 }
@@ -116,21 +122,17 @@ public class FilterDialog {
                 } else {
                     customNamesFinal.put(originalSubject_final, displayName);
                 }
-
                 customNamesFinal.save();
-
-                postExecuteInterface.onPostExecute();
-
-                inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
-                System.out.println("Gespeichert: " + displayName);
             }
+
+            postExecute.run();
+
+            inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
+            System.out.println("Gespeichert: " + displayName);
         })
-        .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
-                System.out.println("Nicht gespeichert");
-            }
+        .setNegativeButton("Abbrechen", (dialog, which) -> {
+            inputManager.hideSoftInputFromWindow(kursName.getWindowToken(), 0);
+            System.out.println("Nicht gespeichert");
         });
 
         mDialog = builder.show();
@@ -138,22 +140,20 @@ public class FilterDialog {
 
         kursName.addTextChangedListener(new InputValidator() {
             @Override
-            protected boolean validate(String text) {
-                if (text.equals(oldName)) {
+            protected boolean validate(String input) {
+                if (input.equals(oldName)) {
                     return true;
                 }
 
-                if (text.trim().length() == 0) {
+                if (input.trim().length() == 0) {
                     kursName.setError(errorText = "Der Anzeigename darf nicht leer sein");
                     return false;
                 }
 
-                if (!text.equals("Nicht anzeigen")) {
-                    for (Map.Entry<String, String> entry : customNamesFinal.entrySet()) {
-                        if (text.equals(entry.getValue())) {
-                            kursName.setError(errorText = "\"" + text + "\" ist schon der Anzeigename für \"" + entry.getKey() + "\"");
-                            return false;
-                        }
+                for (Map.Entry<String, String> entry : customNamesFinal.entrySet()) {
+                    if (input.equals(entry.getValue())) {
+                        kursName.setError(errorText = "\"" + input + "\" ist schon der Anzeigename für \"" + entry.getKey() + "\"");
+                        return false;
                     }
                 }
 
@@ -168,24 +168,6 @@ public class FilterDialog {
         });
     }
 
-    public static String getOriginalSubject(String subject, CustomNames customNames) {
-        if (customNames == null) {
-            return subject;
-        }
-
-        String originalSubject = null;
-        for (Map.Entry<String, String> entry : customNames.entrySet()) {
-            if (entry.getValue().equals(subject)) {
-                originalSubject = entry.getKey();
-                System.out.println("originalSubject = " + originalSubject);
-            }
-        }
-        if (originalSubject == null) {
-            originalSubject = subject;
-        }
-        return originalSubject;
-    }
-
     public void show() {
         show(true);
     }
@@ -193,10 +175,6 @@ public class FilterDialog {
     public void show(boolean toggleKeyboard) {
         mDialog.show();
         if (toggleKeyboard) inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
-    }
-
-    public interface PostExecuteInterface {
-        void onPostExecute();
     }
 }
 

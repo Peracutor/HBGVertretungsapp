@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 
 import com.eissler.micha.hbgvertretungsapp.fcm.InstanceIdListenerService;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 
 public class AlarmReceiver extends BroadcastReceiver implements ProcessorDistributor.ProcessorRegisterer<Intent> {
 

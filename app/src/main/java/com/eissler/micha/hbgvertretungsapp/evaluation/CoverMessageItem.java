@@ -1,14 +1,16 @@
 package com.eissler.micha.hbgvertretungsapp.evaluation;
 
+import android.content.Context;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.RelativeLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.eissler.micha.hbgvertretungsapp.R;
 import com.mikepenz.fastadapter.items.AbstractItem;
 import com.peracutor.hbgserverapi.CoverMessage;
+import com.peracutor.hbgserverapi.ReplacedCoverMessage;
 
 import java.util.List;
 
@@ -22,10 +24,10 @@ import butterknife.ButterKnife;
 
 public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessageItem.ViewHolder> {
 
-    private CoverMessage coverMessage;
+    private ReplacedCoverMessage coverMessage;
     private ViewHolder holder;
 
-    public CoverMessageItem(CoverMessage coverMessage) {
+    public CoverMessageItem(ReplacedCoverMessage coverMessage) {
         this.coverMessage = coverMessage;
     }
 
@@ -45,11 +47,10 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
     public void bindView(ViewHolder holder, List payloads) {
         super.bindView(holder, payloads);
         if (holder != this.holder) {
-            System.out.println("Holder for item " + getIdentifier() + " changed");
-//            if (this.holder != null) this.holder.frameLayout.setBackgroundColor(0/*transparent*/);
             this.holder = holder;
-            setItemBackground(isSelected());
         }
+
+        setItemBackground(isSelected());
 
         final String message = coverMessage.get(CoverMessage.KIND);
 
@@ -71,28 +72,41 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
             holder.messageView.setText(subject + " " + message);
         }
 
-        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) holder.messageView.getLayoutParams();
-        if (!coverText.equals("")) {
-            params.addRule(RelativeLayout.ABOVE, R.id.coverText);
-            params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        Context context = holder.messageView.getContext();
+        if (coverText.equals("")) {
+            holder.coverView.setVisibility(View.GONE);
+            setMargins(pxFromDp(context, 8));
+            holder.messageView.post(() -> {
+                int lineCount = holder.messageView.getLineCount();
+                if (lineCount > 1) {
+                    setMargins(0);
+                }
+            });
         } else {
-            params.addRule(RelativeLayout.ABOVE, 0);
-            params.addRule(RelativeLayout.ALIGN_PARENT_TOP, 0);
+            setMargins(0);
+            holder.coverView.setVisibility(View.VISIBLE);
         }
 
-        if (!(coverText.equals("") || coverText.equals("---"))) {
-            holder.coverView.setText(coverText);
-        } else {
-            holder.coverView.setText("");
-        }
+        holder.coverView.setText(coverText);
 
-        if (room.equals("") || room.equals("---")) {
+        if (room.equals("")) {
             holder.roomText.setText("");
             holder.roomView.setText("");
         } else {
             holder.roomText.setText("Raum");
             holder.roomView.setText(room.substring(1));
         }
+    }
+
+    private void setMargins(int additionalMargin) {
+        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) holder.messageView.getLayoutParams();
+        int defaultMargin = pxFromDp(holder.messageView.getContext(), 6);
+        params.setMargins(0, defaultMargin + additionalMargin, 0, defaultMargin);
+    }
+
+    public static int pxFromDp(final Context context, final int dp) {
+        float density = context.getResources().getDisplayMetrics().density;
+        return (int) (dp * density);
     }
 
 
@@ -111,12 +125,16 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
         holder.frameLayout.setBackgroundColor(color);
     }
 
+//    private void println(String s) {
+//        System.out.println("Item " + getIdentifier() + ": " + s);
+//    }
+
     @Override
     public ViewHolder getViewHolder(View view) {
         return new ViewHolder(view);
     }
 
-    public CoverMessage getCoverMessage() {
+    public ReplacedCoverMessage getCoverMessage() {
         return coverMessage;
     }
 

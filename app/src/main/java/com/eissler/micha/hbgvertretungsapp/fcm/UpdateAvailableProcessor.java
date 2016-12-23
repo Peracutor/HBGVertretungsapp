@@ -10,8 +10,9 @@ import android.support.v4.app.NotificationCompat;
 
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.MainActivity;
-import com.eissler.micha.hbgvertretungsapp.Preferences;
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.RequestCodes;
 import com.google.firebase.messaging.RemoteMessage;
 
 import java.util.Map;
@@ -47,10 +48,10 @@ public class UpdateAvailableProcessor extends ProcessorDistributor.Processor<Rem
             Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, getContext()).edit().putLong(Preferences.Key.LAST_UPDATE_CHECK, 0).apply();
             NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
             String text = String.format("Es ist ein Update zu Version %s verfügbar!", versionName);
-            int id = 29;
 
+            int id = RequestCodes.NOTIFICATION_UPDATE_AVAILABLE;
             Intent intent = new Intent(getContext(), MainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setAction(App.ACTION_UPDATE);
             intent.putExtra("versionNumber", versionNumber);
             intent.putExtra("id", id);

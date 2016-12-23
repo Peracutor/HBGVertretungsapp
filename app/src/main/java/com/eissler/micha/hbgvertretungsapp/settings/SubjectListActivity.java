@@ -5,42 +5,47 @@ import android.os.Bundle;
 import android.support.annotation.StringRes;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.view.ActionMode;
+import android.support.v7.view.ActionMode;
+import android.support.v7.widget.DefaultItemAnimator;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
 
-import com.eissler.micha.hbgvertretungsapp.InputValidator;
 import com.eissler.micha.hbgvertretungsapp.R;
+import com.eissler.micha.hbgvertretungsapp.util.FastAdapterHelper;
+import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
+import com.mikepenz.fastadapter.FastAdapter;
+import com.mikepenz.fastadapter.IItem;
+import com.mikepenz.fastadapter.adapters.FastItemAdapter;
 
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Created by Micha.
  * 17.09.2016
  */
-public abstract class SubjectListActivity extends AppCompatActivity implements ActionMode.Callback {
+public abstract class SubjectListActivity<T extends IItem> extends AppCompatActivity implements ActionMode.Callback {
 
-    private SubjectListAdapter adapter;
-
-    static ActionMode mActionMode = null;
+    protected FastItemAdapter<T> fastAdapter;
+    private T noItemsItem;
 
 
     protected abstract void initialize();
 
-    protected abstract SubjectListAdapter getSubjectListAdapter();
-
-    protected abstract ArrayList<String> getData();
+    protected abstract List<T> getItems(); // TODO: 23.12.2016 when returning multiple items, list is completely screwed
 
     protected abstract void addToData(String subject);
 
-    protected abstract void removeFromData(ArrayList<Integer> indices);
+    protected abstract void removeFromData(Set<T> indices);
 
-    protected abstract void saveData();
+    protected abstract T getNoItemsItem();
+
 
     @StringRes protected abstract int getLabelResource();
 
@@ -51,31 +56,21 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
 
         ((TextView) findViewById(R.id.label)).setText(getLabelResource());
 
-        ListView listView = (ListView) findViewById(R.id.list);
+        RecyclerView recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setItemAnimator(new DefaultItemAnimator());
+
+        fastAdapter = new FastItemAdapter<>();
+        fastAdapter.setHasStableIds(true);
 
         initialize();
 
-        adapter = getSubjectListAdapter();
+        fastAdapter = FastAdapterHelper.setupMultiSelectAdapter(fastAdapter, this, this, null, getOnClickListener());
 
-        adapter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (adapter.getNumberOfSelectedItems() == 1) {
-                    mActionMode = SubjectListActivity.this.startActionMode(SubjectListActivity.this);
-                    adapter.setSelectionMode(true);
-                }
-            }
+        recyclerView.setAdapter(this.fastAdapter);
 
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                if (mActionMode != null) {
-                    mActionMode.finish();
-                }
-            }
-        });
-
-        //noinspection ConstantConditions
-        listView.setAdapter(adapter);
+        noItemsItem = getNoItemsItem();
+        noItemsItem.withSelectable(false);
 
         updateList();
 
@@ -83,6 +78,10 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
 //        final InputMethodManager inputManager = ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE));
 
     }
+
+
+
+
 
     protected void addTextWatcher(final EditText editText, final AlertDialog dialog) {
         editText.addTextChangedListener(new InputValidator() {
@@ -107,18 +106,17 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
     }
 
     protected void updateList() {
-        adapter.setData(getData());
+        List<T> items = getItems();
+        if (items.isEmpty()) {
+            items = Collections.singletonList(noItemsItem);
+        }
+        fastAdapter.set(items);
     }
+
 
     @Override
     public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-        mode.getMenuInflater().inflate(R.menu.menu_cab_whitelist, menu);
-        if (!showCheckBoxesConstantly()) adapter.notifyDataSetChanged();
         return true;
-    }
-
-    protected boolean showCheckBoxesConstantly() {
-        return false;
     }
 
     @Override
@@ -129,11 +127,10 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
     @Override
     public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
         if (item.getItemId() == R.id.item_delete) {
-            removeFromData(adapter.getSelectedItems());
-            saveData();
+            removeFromData(fastAdapter.getSelectedItems());
 
             updateList();
-            mActionMode.finish();
+            mode.finish();
             return true;
         }
         return false;
@@ -142,9 +139,6 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
 
     @Override
     public void onDestroyActionMode(ActionMode mode) {
-        mActionMode = null;
-        adapter.clearSelection(true);
-        adapter.setSelectionMode(false);
     }
 
     @Override
@@ -171,37 +165,37 @@ public abstract class SubjectListActivity extends AppCompatActivity implements A
 
         final AlertDialog dialog = new AlertDialog.Builder(SubjectListActivity.this).setView(dialogView)
                 .setTitle("Fach hinzufügen")
-                .setPositiveButton("Hinzufügen", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog1, int which) {
-                        String subject = editText.getText().toString();
+                .setPositiveButton("Hinzufügen", (dialog1, which) -> {
+                    String subject = editText.getText().toString();
 
-                        if (subject.equals("")) {
-                            return;
-                        }
-
-                        addToData(subject);
-                        updateList();
-                        saveData();
-
-
-                        //                        if (getCurrentFocus() == null) { // 17.09.2016 hiding did not work, maybe retry implement
-                        //                            System.out.println("No focus");
-                        //                            return;
-                        //                        }
-                        //                        if (getCurrentFocus().getWindowToken() == null) {
-                        //                            System.out.println("No WindowToken");
-                        //                            return;
-                        //                        }
-                        //                        System.out.println("Hide Keyboard");
-                        //                        inputManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                    if (subject.equals("")) {
+                        return;
                     }
+
+                    addToData(subject);
+                    updateList();
+
+
+                    //                        if (getCurrentFocus() == null) { // 17.09.2016 hiding did not work, maybe retry implement
+                    //                            System.out.println("No focus");
+                    //                            return;
+                    //                        }
+                    //                        if (getCurrentFocus().getWindowToken() == null) {
+                    //                            System.out.println("No WindowToken");
+                    //                            return;
+                    //                        }
+                    //                        System.out.println("Hide Keyboard");
+                    //                        inputManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
                 })
                 .setNegativeButton("Abbrechen", null)
                 .show();
 
         addTextWatcher(editText, dialog);
         //                inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+    }
+
+    protected FastAdapter.OnClickListener<T> getOnClickListener() {
+        return null;
     }
 }
 

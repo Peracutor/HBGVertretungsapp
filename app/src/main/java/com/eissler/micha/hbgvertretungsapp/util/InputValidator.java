@@ -1,4 +1,4 @@
-package com.eissler.micha.hbgvertretungsapp;
+package com.eissler.micha.hbgvertretungsapp.util;
 
 import android.text.Editable;
 import android.text.TextWatcher;

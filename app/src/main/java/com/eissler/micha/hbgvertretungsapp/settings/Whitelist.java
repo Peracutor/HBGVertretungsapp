@@ -2,27 +2,17 @@ package com.eissler.micha.hbgvertretungsapp.settings;
 
 import android.content.Context;
 
-import com.eissler.micha.hbgvertretungsapp.App;
-import com.eissler.micha.hbgvertretungsapp.Preferences;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.eissler.micha.hbgvertretungsapp.fcm.PushNotifications;
-
-import org.acra.ACRA;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 
 /**
  * Created by Micha.
  * 22.05.2016
  */
-public class Whitelist extends ArrayList<String> {
+public class Whitelist extends SavedList {
 
     private static final String WHITELIST_ITEMS = "WhitelistItems";
 
-
-    private final Context context;
     private boolean pushEnabled;
 
     private PushNotifications pushNotifications;
@@ -36,45 +26,12 @@ public class Whitelist extends ArrayList<String> {
     }
 
     private Whitelist(Context context) {
-        this(context, 0);
+        this(context, 10);
     }
 
     private Whitelist(Context context, int capacity) {
-        super(capacity);
-        this.context = context;
-
-        ArrayList<String> whitelist = null;
-        try {
-            whitelist = App.retrieveObject(WHITELIST_ITEMS, context);
-        } catch (FileNotFoundException e) {
-            System.out.println("No Whitelist saved: " + e.getMessage());
-        } catch (ClassNotFoundException | IOException e) {
-            App.exitWithError(e);
-            return;
-        }
-
-        if (whitelist != null) {
-            this.addAll(whitelist);
-        }
-
+        super(WHITELIST_ITEMS, capacity, context);
         pushEnabled = PushNotifications.isEnabled(context);
-    }
-
-    public boolean save() {
-        if (contains(null)) removeAll(Collections.singleton(null));
-
-        if (pushEnabled()) {
-            pushNotifications.saveEdits();
-        }
-
-        try {
-            App.writeObject(new ArrayList<>(this), WHITELIST_ITEMS, context);
-            return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            ACRA.getErrorReporter().handleSilentException(e);
-        }
-        return false;
     }
 
     private boolean pushEnabled() {
@@ -82,6 +39,14 @@ public class Whitelist extends ArrayList<String> {
             pushNotifications = PushNotifications.newInstance(context);
         }
         return pushEnabled;
+    }
+
+    @Override
+    public boolean save() {
+        if (pushEnabled()) {
+            pushNotifications.saveEdits();
+        }
+        return super.save();
     }
 
     @Override

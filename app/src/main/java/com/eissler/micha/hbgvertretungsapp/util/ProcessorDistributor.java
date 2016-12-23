@@ -1,4 +1,4 @@
-package com.eissler.micha.hbgvertretungsapp;
+package com.eissler.micha.hbgvertretungsapp.util;
 
 import android.content.Context;
 
@@ -27,7 +27,6 @@ public class ProcessorDistributor<T> {
 
         if (processor != null) {
             processor.process(object);
-            processor.updateContext(null);
         }
     }
 

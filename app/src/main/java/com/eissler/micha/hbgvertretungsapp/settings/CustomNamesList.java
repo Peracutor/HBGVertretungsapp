@@ -4,17 +4,19 @@ import android.content.DialogInterface;
 import android.support.v7.app.AlertDialog;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.TextView;
 
 import com.eissler.micha.hbgvertretungsapp.FilterDialog;
-import com.eissler.micha.hbgvertretungsapp.InputValidator;
 import com.eissler.micha.hbgvertretungsapp.R;
+import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
+import com.mikepenz.fastadapter.FastAdapter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
-public class CustomNamesList extends SubjectListActivity {
+public class CustomNamesList extends SubjectListActivity<SimpleTextItem> {
 
     private CustomNames customNames;
     private boolean validOriginalName;
@@ -26,40 +28,32 @@ public class CustomNamesList extends SubjectListActivity {
     }
 
     @Override
-    protected SubjectListAdapter getSubjectListAdapter() {
-        return new CustomNamesAdapter();
-    }
-
-    @Override
-    protected ArrayList<String> getData() {
-        ArrayList<String> data = new ArrayList<>(12);
-
+    protected List<SimpleTextItem> getItems() {
+        System.out.println("CustomNamesList.getItems");
+        ArrayList<SimpleTextItem> items = new ArrayList<>();
         for (Map.Entry<String, String> entry : customNames.entrySet()) {
-            if (!entry.getValue().equals("Nicht anzeigen")) {
-                data.add(entry.getKey() + ": " + entry.getValue());
-            }
+            String text = entry.getKey() + ": " + entry.getValue();
+            System.out.println("text = " + text);
+            items.add(new SimpleTextItem(text, fastAdapter));
         }
-
-        return data;
+        return items;
     }
 
     @Override
-    protected void addToData(String subject) {
-
-    }
+    protected void addToData(String subject) {/*never gets called, as actionAdd is overridden*/}
 
     @Override
-    protected void removeFromData(ArrayList<Integer> indices) {
-        ArrayList<String> data = getData();
-        for (Integer index : indices) {
-            String subject = data.get(index).split(":")[0];
+    protected void removeFromData(Set<SimpleTextItem> selectedItems) {
+        for (SimpleTextItem item : selectedItems) {
+            String subject = item.getText().split(":")[0];
             customNames.remove(subject);
         }
+        customNames.save();
     }
 
     @Override
-    protected void saveData() {
-        customNames.save();
+    protected SimpleTextItem getNoItemsItem() {
+        return new SimpleTextItem("Keine Anzeigenamen gespeichert", fastAdapter).withSelectable(false);
     }
 
     @Override
@@ -67,6 +61,14 @@ public class CustomNamesList extends SubjectListActivity {
         return R.string.label_custom_names_list;
     }
 
+    @Override
+    protected FastAdapter.OnClickListener<SimpleTextItem> getOnClickListener() {
+        return (v, adapter, item, position) -> {
+            String[] split = item.getText().split(":");
+            new FilterDialog(split[0].trim(), split[1].trim(), customNames, CustomNamesList.this, CustomNamesList.this::updateList).show();
+            return true;
+        };
+    }
 
     @Override
     protected void actionAdd() {
@@ -77,17 +79,14 @@ public class CustomNamesList extends SubjectListActivity {
         final AlertDialog dialog = new AlertDialog.Builder(CustomNamesList.this)
                 .setView(dialogView)
                 .setTitle("Fach hinzufügen")
-                .setPositiveButton("Hinzufügen", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
+                .setPositiveButton("Hinzufügen", (dialog1, which) -> {
 
-                        String originalName = originalDisplayname.getText().toString();
-                        String newName = newDisplayName.getText().toString();
+                    String originalName = originalDisplayname.getText().toString();
+                    String newName = newDisplayName.getText().toString();
 
-                        customNames.put(originalName, newName);
-                        updateList();
-                        customNames.save();
-                    }
+                    customNames.put(originalName, newName);
+                    updateList();
+                    customNames.save();
                 })
                 .setNegativeButton("Abbrechen", null)
                 .show();
@@ -134,35 +133,5 @@ public class CustomNamesList extends SubjectListActivity {
             }
         });
         dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(false);
-    }
-
-    class CustomNamesAdapter extends SubjectListAdapter {
-        public CustomNamesAdapter() {
-            super(getData(), CustomNamesList.this);
-        }
-
-        @Override
-        protected String getNoItemsString() {
-            return "Keine Anzeigenamen gespeichert";
-        }
-
-        @Override
-        protected View.OnClickListener getNonSelectiveListener() {
-            return new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-
-                    String[] split = ((TextView) view.findViewById(R.id.textView)).getText().toString().split(":");
-                    new FilterDialog(split[1].trim(), split[0].trim(), customNames,
-                            new FilterDialog.PostExecuteInterface() {
-                                @Override
-                                public void onPostExecute() {
-                                    updateList();
-                                }
-                            },
-                            CustomNamesList.this).show();
-                }
-            };
-        }
     }
 }

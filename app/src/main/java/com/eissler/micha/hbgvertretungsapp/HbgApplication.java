@@ -2,6 +2,7 @@ package com.eissler.micha.hbgvertretungsapp;
 
 import android.app.Application;
 
+import org.acra.ACRA;
 import org.acra.ReportingInteractionMode;
 import org.acra.annotation.ReportsCrashes;
 
@@ -33,7 +34,7 @@ public class HbgApplication extends Application {
         TimeZone.setDefault(TimeZone.getTimeZone("CET"));
 //        Ion.getDefault(this).configure().setLogging("Ion", Log.INFO);
         // The following line triggers the initialization of ACRA
-//        ACRA.init(this); // TODO: 02.03.2016 uncomment!!!
+        ACRA.init(this);
     }
 
     //    /**

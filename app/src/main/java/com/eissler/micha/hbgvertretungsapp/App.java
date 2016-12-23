@@ -12,6 +12,17 @@ import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 
+import com.eissler.micha.hbgvertretungsapp.settings.AutoName;
+import com.eissler.micha.hbgvertretungsapp.settings.Blacklist;
+import com.eissler.micha.hbgvertretungsapp.settings.CustomNames;
+import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.peracutor.hbgserverapi.BlacklistFilter;
+import com.peracutor.hbgserverapi.CustomNameReplacer;
+import com.peracutor.hbgserverapi.Filter;
+import com.peracutor.hbgserverapi.Replacer;
+import com.peracutor.hbgserverapi.WhitelistFilter;
+
 import org.acra.ACRA;
 
 import java.io.FileInputStream;
@@ -19,13 +30,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Locale;
 
 public class App {
-
-    public final static String CUSTOM_NAMES = "CustomNames";
 
     private static final String CODE_SECTION_REACHED = "CODE_SECTION_REACHED";
     private static final String ERROR = "ERROR";
@@ -34,12 +41,8 @@ public class App {
     private static final String INTERNET = "INTERNET";
     private static final String USER_INPUT = "USER_INPUT";
 
+    private static final char[] UMLAUTS = "äöüÄÖÜß".toCharArray();
 
-    public static final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
-//    public static final SimpleDateFormat TIME_SDF = new SimpleDateFormat("HH:mm", Locale.GERMANY);
-    public static final SimpleDateFormat NORMAL_SDF = new SimpleDateFormat("dd.MM.yy", Locale.GERMANY);
-    public static final SimpleDateFormat PRECISE_SDF = new SimpleDateFormat("EE HH:mm:ss dd.MM.yy", Locale.GERMANY);
-    public static final SimpleDateFormat DAY_NAME_SDF = new SimpleDateFormat("EE", Locale.GERMANY);
 
     public static final String ACTION_UPDATE = "ACTION_UPDATE";
 
@@ -97,9 +100,6 @@ public class App {
 
     public static void reportUnexpectedException(Exception e) {
         App.logError("EXCEPTION!");
-        if (true) {  // TODO: 20.03.2016 remove!!!
-            return;
-        }
 
         ACRA.getErrorReporter().putCustomData(INFO, "APP DID NOT CRASH");
         ACRA.getErrorReporter().handleSilentException(e);
@@ -122,16 +122,15 @@ public class App {
         return new Date().getTime() - lastReload.getTime() > millisLater;
     }
 
-    public static void exitWithError(Exception e) {
+    public static void exitWithError(Throwable e) {
         e.printStackTrace();
         ACRA.getErrorReporter().handleException(e, true);
     }
 
     public static NotificationCompat.Builder getIntentNotificationBuilder(Context context) {
         Intent intent = new Intent(context, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0 /* Request code */, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, RequestCodes.ACTIVITY_OPEN_NOTIFICATION, intent, 0);
 
         return getNotificationBuilder(context)
                 .setContentIntent(pendingIntent);
@@ -146,6 +145,38 @@ public class App {
 //                .setVibrate(new long[]{0,200,200,200})
 //                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 ;
+    }
+
+    public static int getSelectedClass(Context context) {
+        return Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, context).getInt(Preferences.Key.SELECTED_CLASS, 0);
+    }
+
+    public static Filter getCoverMessageFilter(Context context) {
+        if (Whitelist.isWhitelistModeActive(context)) {
+            return new WhitelistFilter(Whitelist.get(context));
+        } else {
+            return new BlacklistFilter(Blacklist.get(context));
+        }
+    }
+
+    public static Replacer getReplacer(Context context) {
+        return AutoName.isAutoNamingEnabled(context) ?
+                new CustomNameReplacer(CustomNames.get(context), new AutoName(context)) :
+                new CustomNameReplacer(CustomNames.get(context));
+    }
+
+    public static String decodeUmlauts(String s) { //encoding/decoding needed because it was f***ing impossible to change default-encoding to UTF-8 on AppEngine: http://stackoverflow.com/questions/41204936/google-appengine-how-to-set-default-charset-file-encoding-to-utf-8-for-goo
+        for (char umlaut : UMLAUTS) {
+            s = s.replace("%" + (int) umlaut + "%", umlaut + "");
+        }
+        return s;
+    }
+
+    public static String encodeUmlauts(String s) {
+        for (char umlaut : UMLAUTS) {
+            s = s.replace(umlaut + "", "%" + (int) umlaut + "%");
+        }
+        return s;
     }
 
     public interface WaitFor<T> {

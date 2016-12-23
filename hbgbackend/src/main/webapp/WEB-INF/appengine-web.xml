@@ -22,8 +22,5 @@
 
         <property name="gcm.api.key" value="AIzaSyDA_3IwjjfPUL_707IymrDmBJfDMQegZg0"/>
     </system-properties>
-    <!--<env-variables>-->
-        <!--<env-var name="DEFAULT_ENCODING" value="UTF-8" />-->
-    <!--</env-variables>-->
 
 </appengine-web-app>

@@ -6,23 +6,30 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Locale;
 
 public class HbgDataDownload extends HbgDownload<SortedCoverMessages> {
-    public static final String HBG_URL_FORMAT = "http://vp.hbgym.de/w/%s/w000%s%d.htm";
+    private static final String HBG_URL_FORMAT = "http://vp.hbgym.de/w/%1$02d/w000%2$02d.htm";
 
     private final int year;
 
     public HbgDataDownload(int classNum, int weekNumber) {
         super(makeURL(weekNumber, classNum));
+        year = getYear(weekNumber);
+    }
+
+    public HbgDataDownload(int classNum, int weekNumber, HtmlDownloadHandler downloadHandler) {
+        super(makeURL(weekNumber, classNum), downloadHandler);
+        year = getYear(weekNumber);
+    }
+
+    public static int getYear(int weekNumber) {
         Calendar calendar = Calendar.getInstance(Locale.GERMANY);
-        this.year = weekNumber < calendar.get(Calendar.WEEK_OF_YEAR) ? calendar.get(Calendar.YEAR) + 1 : calendar.get(Calendar.YEAR);
-        System.out.println("year = " + year);
+        return weekNumber < calendar.get(Calendar.WEEK_OF_YEAR) ? calendar.get(Calendar.YEAR) + 1 : calendar.get(Calendar.YEAR);
     }
 
     public static String makeURL(int weekNumber, int classNum) {
-        return String.format(Locale.GERMANY, HBG_URL_FORMAT, weekNumber < 10 ? "0" + weekNumber : weekNumber, (classNum < 10) ? "0" : "", classNum);
+        return String.format(Locale.GERMANY, HBG_URL_FORMAT, weekNumber, classNum);
     }
 
     @Override
@@ -90,18 +97,6 @@ public class HbgDataDownload extends HbgDownload<SortedCoverMessages> {
             messages.insert(new CoverMessage(messageBuilder));
         }
         return messages;
-    }
-
-    public static Calendar getDayToNotify() {
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.HOUR_OF_DAY, 12);
-        calendar.set(Calendar.MINUTE, 0);
-
-        if (new Date().after(calendar.getTime())) {
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
-        }
-        System.out.println("dayToNotify= " + calendar.get(Calendar.DAY_OF_WEEK));
-        return calendar;
     }
 
     //    private ArrayList<String[]> sortList(ArrayList<String[]> unsortedList) {

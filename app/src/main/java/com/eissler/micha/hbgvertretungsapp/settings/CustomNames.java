@@ -10,6 +10,7 @@ import java.util.HashMap;
 
 public class CustomNames extends HashMap<String, String> {
 
+    public final static String CUSTOM_NAMES = "CustomNames";
     private Context context;
 
 
@@ -31,7 +32,7 @@ public class CustomNames extends HashMap<String, String> {
 
         HashMap<String, String> customNames;
         try {
-            customNames = App.retrieveObject(App.CUSTOM_NAMES, context);
+            customNames = App.retrieveObject(CUSTOM_NAMES, context);
         } catch (FileNotFoundException e) {
             App.logError("No CustomNames-file found.");
             return;
@@ -53,7 +54,7 @@ public class CustomNames extends HashMap<String, String> {
      */
     public boolean save() {
         try {
-            App.writeObject(new HashMap<>(this), App.CUSTOM_NAMES, context);
+            App.writeObject(new HashMap<>(this), CUSTOM_NAMES, context);
         } catch (Exception e) {
             App.logError("Error writing object customNames");
             App.reportUnexpectedException(e);

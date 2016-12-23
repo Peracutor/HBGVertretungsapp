@@ -92,7 +92,7 @@ public class MessagingEndpoint {
 //        }
 //    }
 
-    public void sendMessageTo(@Named("to") String to, Message message) throws IOException {
+    public static void sendMessageTo(String to, Message message) throws IOException {
         boolean matches = to.matches("/topics/[a-zA-Z0-9-_.~%]+");
         log.info("sending to topic? " + matches);
 
@@ -126,8 +126,25 @@ public class MessagingEndpoint {
 //        }
     }
 
+    public static void sendToMultipleTopics(String condition, Message message) throws IOException {
+        com.peracutor.hbgbackend.Result result = new Sender(API_KEY).sendMessageMultipleTopics(message, condition, 3);
+        log.info("result = " + result.toString());
+        log.info("result.getErrorCodeName() = " + result.getErrorCodeName());
+    }
 
-    public void sendNotification(@Named("to") String to, @Named("titleNoUmlauts") String title, @Named("bodyNoUmlauts") String body, @Nullable @Named("imageUrl") String imageUrl, @Nullable @Named("endDate") String endDate/*, @Nullable @Named("collapseKey") String collapseKey*/) throws IOException, ParseException {
+
+    public void sendNotification(@Nullable @Named("to") String to, @Nullable @Named("condition") String condition, @Named("titleNoUmlauts") String title, @Named("bodyNoUmlauts") String body, @Nullable @Named("imageUrl") String imageUrl, @Nullable @Named("endDate") String endDate/*, @Nullable @Named("collapseKey") String collapseKey*/) throws IOException, ParseException {
+
+        Date date = null;
+        if (endDate != null) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY);
+            date = dateFormat.parse(endDate);
+        }
+        sendNotification(to, condition, title, body, imageUrl, date);
+
+    }
+
+    private static void sendNotification(String to, String condition, String title, String body, String imageUrl, Date date) throws IOException {
         Map<String, String> notificationData = new HashMap<>(4);
         System.out.println("Charset.defaultCharset() = " + Charset.defaultCharset());
 //        title = replaceUmlauts(title);
@@ -144,11 +161,9 @@ public class MessagingEndpoint {
         Message.Builder message = new Message.Builder()
                 .setData(notificationData);
 
-        if (endDate != null) {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY);
-            Date date = dateFormat.parse(endDate);
 
-            int timeToLive = (int) ((date.getTime() - Calendar.getInstance().getTimeInMillis()) / 60);
+        if (date != null) {
+            int timeToLive = (int) ((date.getTime() - new Date().getTime()) / 60);
             if (timeToLive < 0) {
                 log.warning("endDate is in the past, not sending message");
                 return;
@@ -156,33 +171,28 @@ public class MessagingEndpoint {
             message.timeToLive(timeToLive);
         }
 
-        sendMessageTo(to, message.build());
-
+        if (to != null) sendMessageTo(to, message.build());
+        else if (condition != null) sendToMultipleTopics(condition, message.build());
     }
 
 //    private String convertToUTF8(String s) {
 //        return new String(s.getBytes(), Charset.forName("US-ASCII"));
 //    }
 //
-//    private static String replaceUmlauts(String s) {
-//        return s.replace("ae", "ä").replace("ue", "ü").replace("oe", "ö")
-//                .replace("Ae", "Ä").replace("Ue", "Ü").replace("Oe", "Ö")
-//                .replace("s_z", "ß");
-//    }
 
-    public void sendTestPush(@Named("token") String token, @Named("acraID") String acraID) {
+
+    public void sendTestPush(@Named("token") String token) {
         log.info("MessagingEndpoint.sendTestPush");
 
-        new RegistrationEndpoint().registerDevice(token, acraID);
-        Calendar calendar = Calendar.getInstance();
+        Calendar calendar = Calendar.getInstance(Locale.GERMANY);
         calendar.add(Calendar.SECOND, 30);
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY);
 
         try {
-            sendNotification(token, "Testbenachrichtigung", "Das ist eine Testnachricht", null, dateFormat.format(new Date(calendar.getTimeInMillis())));
-        } catch (IOException | ParseException e) {
+            sendNotification(token, null, "Testbenachrichtigung", "Das ist eine Testnachricht", null, calendar.getTime());
+        } catch (IOException e) {
             e.printStackTrace();
         }
+//        new RegistrationEndpoint().registerDevice(token, acraID);
     }
 
     @ApiMethod

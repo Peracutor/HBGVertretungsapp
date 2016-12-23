@@ -1,8 +1,11 @@
 package com.peracutor.hbgserverapi;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Locale;
 
@@ -12,11 +15,26 @@ import java.util.Locale;
  */
 public class SortedCoverMessages extends ArrayList<CoverMessage> {
     private final ArrayList<String> mDays;
+    private final Comparator<? super String> mDayComparator = new Comparator<String>() {
+        private final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
+
+        @Override
+        public int compare(String day1, String day2) {
+            try {
+                Date d1 = SHORT_SDF.parse(day1);
+                Date d2 = SHORT_SDF.parse(day2);
+                return d1.compareTo(d2);
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+            return 0;
+        }
+    };
 
     /*For Objectify*/
-    @SuppressWarnings("unused")
-    private SortedCoverMessages() {
-        this(0);
+    public SortedCoverMessages() {
+        super();
+        mDays = new ArrayList<>();
     }
 
     public SortedCoverMessages(int initialCapacity) {
@@ -24,22 +42,17 @@ public class SortedCoverMessages extends ArrayList<CoverMessage> {
         mDays = new ArrayList<>();
     }
 
-//    public SortedCoverMessages(SortedCoverMessages sortedCoverMessages) {
-//        super(sortedCoverMessages);
-//        mDays = sortedCoverMessages.getDays();
-//    }
-
     public void insert(CoverMessage message) {
 
         if (!mDays.contains(message.get(CoverMessage.DATE))) {
             mDays.add(message.get(CoverMessage.DATE));
+            Collections.sort(mDays,  mDayComparator);
         }
 
         boolean added = false;
         for (int i = 0; i < size(); i++) {
             added = get(i).tryMerge(message);
             if (added) {
-                System.out.println("Merge successful for " + message.get(CoverMessage.SUBJECT));
                 break;
             } else if (message.getConcernedDate().before(get(i).getConcernedDate())) {
                 add(i, message);
@@ -53,25 +66,36 @@ public class SortedCoverMessages extends ArrayList<CoverMessage> {
         }
     }
 
-    public ArrayList<CoverMessage> getMessagesForDay(String day, Replacer replacer) {
-        ArrayList<CoverMessage> dayMessages = new ArrayList<>();
+    public ArrayList<ReplacedCoverMessage> getMessagesForDay(String day, Filter filter, Replacer replacer) {
+        ArrayList<ReplacedCoverMessage> dayMessages = new ArrayList<>();
 
-        for (CoverMessage coverMsg :
-                this) {
+        if (filter == null) {
+            filter = coverMessage -> true;
+        }
+        if (replacer == null) {
+            replacer = messageToReplace -> {
+                if (messageToReplace instanceof ReplacedCoverMessage) {
+                    return (ReplacedCoverMessage) messageToReplace;
+                } else {
+                    return new ReplacedCoverMessage(messageToReplace);
+                }
+            };
+        }
+
+        for (CoverMessage coverMsg : this) {
             if (day.equals(coverMsg.get(CoverMessage.DATE))) {
-                CoverMessage coverMsgClone = replacer.replace(coverMsg.clone());
-                if (coverMsgClone == null) continue;
-                dayMessages.add(coverMsgClone);
+                if (!filter.shouldShowMessage(coverMsg)) {
+                    continue;
+                }
+                ReplacedCoverMessage replacedCoverMessage = replacer.replace(coverMsg);
+                dayMessages.add(replacedCoverMessage);
             } else if (dayMessages.size() != 0) {
+                //as list is sorted, further looping would be redundant
                 break;
             }
         }
 
         return dayMessages;
-    }
-
-    public int getMessageCount() {
-        return size();
     }
 
     public ArrayList<String> getDays() {
@@ -84,8 +108,9 @@ public class SortedCoverMessages extends ArrayList<CoverMessage> {
         super.clear();
     }
 
-    public ArrayList<HBGMessage> getListItems(Replacer replacer) {
-        ArrayList<HBGMessage> listItems = new ArrayList<>(getMessageCount());
+    public ArrayList<HBGMessage> getListItems(Filter filter, Replacer replacer) {
+
+        ArrayList<HBGMessage> listItems = new ArrayList<>(size());
 
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 8);
@@ -97,7 +122,7 @@ public class SortedCoverMessages extends ArrayList<CoverMessage> {
 
         final SimpleDateFormat dayNameSdf = new SimpleDateFormat("EE", Locale.GERMANY);
         for (String day : getDays()) {
-            ArrayList<CoverMessage> dayMessages = getMessagesForDay(day, replacer);
+            ArrayList<ReplacedCoverMessage> dayMessages = getMessagesForDay(day, filter, replacer);
             if (dayMessages.size() == 0) continue;
 
             Calendar concernedDate = dayMessages.get(0).getConcernedDate();
@@ -123,34 +148,20 @@ public class SortedCoverMessages extends ArrayList<CoverMessage> {
             listItems.add(new HeaderMessage(dateHeaderText));
 
             boolean added = false;
-            for (CoverMessage coverMessage : dayMessages) {
-                CoverMessage coverMessageCopy = coverMessage.clone();
-
-
-                if (new Date().after(coverMessageCopy.getConcernedDate().getTime())) {
+            for (ReplacedCoverMessage coverMessage : dayMessages) {
+                if (new Date().after(coverMessage.getConcernedDate().getTime())) {
                     continue;
                 }
 
-//                if (replacer != null) {
-//                    coverMessageCopy = replacer.replace(coverMessageCopy);
-//                    if (coverMessageCopy == null) {
-//                        continue;
-//                    }
-//                }
-
                 added = true;
-                listItems.add(coverMessageCopy);
+                listItems.add(coverMessage);
             }
 
             if (!added) {
                 listItems.remove(listItems.size() - 1);
             }
         }
-
-        if (listItems.size() <= 1) {
-            listItems.clear();
-            listItems.add(new HeaderMessage("Keine Vertretungsdaten"));
-        }
         return listItems;
     }
+
 }

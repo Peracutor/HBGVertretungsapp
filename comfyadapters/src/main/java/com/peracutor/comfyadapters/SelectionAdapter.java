@@ -50,6 +50,7 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
     /**
      * Selects/Deselects the item at the given position. Does nothing if the item is already selected
      *
+     * @param select true to select, false to deselect
      * @param position The position of the item to be selected.
      * @param notifyDataSetChanged Pass true for this if you want to call notifyDataSetChanged() after selecting.
      */
@@ -70,6 +71,10 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
                 notifyDataSetChanged();
             }
 
+            if (getSelectedItems().size() == 1) {
+                setSelectionMode(true);
+            }
+
             if (mOnItemSelectedListener != null) {
                 mOnItemSelectedListener.onItemSelected(null, null, position, getItemId(position));
             }
@@ -88,7 +93,7 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
         if (index != -1) {
             selectedItems.remove(index);
 
-            if (mOnItemSelectedListener != null && !itemsSelected()) {
+            if (mOnItemSelectedListener != null && selectedItems.size() == 0) {
                 mOnItemSelectedListener.onNothingSelected(null);
             }
 
@@ -99,20 +104,6 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
         }
         return false;
 
-    }
-
-    /**
-     * @return {@code true} if at least one item is selected.
-     */
-    public boolean itemsSelected() {
-        return selectedItems.size() > 0;
-    }
-
-    /**
-     * @return The number of selected items.
-     */
-    public int getNumberOfSelectedItems() {
-        return selectedItems.size();
     }
 
     /**
@@ -173,6 +164,8 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
 
     public abstract class SelectableViewHolder extends ViewHolder {
 
+        private boolean selectionMode = false;
+
         @Override
         final protected void recycleViewHolder(int position, View convertView) {
             if (isSelected(position)) {
@@ -181,10 +174,9 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
                 onItemDeselected(position);
             }
 
-            if (isSelectionMode()) {
-                onSelectionModeEnabled(position);
-            } else {
-                onSelectionModeDisabled(position);
+            if (selectionMode != isSelectionMode()) {
+                selectionMode = isSelectionMode();
+                onSelectionModeChanged(selectionMode, position);
             }
 
             recycleSelectableViewHolder(position, convertView);
@@ -196,8 +188,6 @@ public abstract class SelectionAdapter extends ComfyBaseAdapter {
 
         protected abstract void onItemDeselected(int position);
 
-        protected abstract void onSelectionModeEnabled(int position);
-
-        protected abstract void onSelectionModeDisabled(int position);
+        protected abstract void onSelectionModeChanged(boolean selectionMode, int position);
     }
 }

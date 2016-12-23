@@ -38,9 +38,10 @@ public class CoverMessageWrapper extends CoverMessage {
     public String getTopic(int classNum) {
         String topic;
         if (get(SUBJECT).equals("") && get(NEW_SUBJECT).equals("")) {
-            topic = String.format("/topics/%s", classNum);
+            topic = String.valueOf(classNum);
         } else {
-            topic = String.format("/topics/%s-%s",
+
+            topic = String.format("%s-%s",
                     classNum,
                     !get(SUBJECT).equals("") ? get(SUBJECT) : get(NEW_SUBJECT));
         }

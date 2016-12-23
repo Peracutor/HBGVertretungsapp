@@ -21,9 +21,9 @@ public class DownloadException extends Exception {
         super(getMessageForErrorType(errorType));
     }
 
-    public DownloadException(ErrorType errorType, Throwable cause) {
-        super(getMessageForErrorType(errorType), cause);
-    }
+//    public DownloadException(ErrorType errorType, Throwable cause) {
+//        super(getMessageForErrorType(errorType), cause);
+//    }
 
     public DownloadException(Throwable cause) {
         super(getMessageForErrorType(getErrorTypeFor(cause)), cause);
@@ -42,8 +42,6 @@ public class DownloadException extends Exception {
     }
 
     public static DownloadException getCorrespondingExceptionFor(Throwable e) {
-        System.out.println("Error/Cause: " + e.getMessage());
-        e.printStackTrace();
         if (e instanceof DownloadException) {
             return (DownloadException) e;
         } else {

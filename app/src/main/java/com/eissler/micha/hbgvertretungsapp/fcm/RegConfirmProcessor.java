@@ -1,7 +1,7 @@
 package com.eissler.micha.hbgvertretungsapp.fcm;
 
-import com.eissler.micha.hbgvertretungsapp.Preferences;
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.google.firebase.messaging.RemoteMessage;
 
 /**
@@ -20,7 +20,7 @@ public class RegConfirmProcessor extends ProcessorDistributor.Processor<RemoteMe
         System.out.println("Registration confirmed");
         Preferences sharedPreferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, getContext());
         sharedPreferences.edit().putBoolean(Preferences.Key.TOKEN_SENT, true).apply();
-        new InstanceIdListenerService.RegisterCheckBackoff(getContext()).reset();
+        InstanceIdListenerService.getRegisterCheckBackoff(getContext()).reset();
 
 
     }

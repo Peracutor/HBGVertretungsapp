@@ -2,7 +2,8 @@ package com.eissler.micha.hbgvertretungsapp.fcm;
 
 import android.util.Log;
 
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.App;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -19,7 +20,7 @@ public class FcmProcessorDistributor extends FirebaseMessagingService implements
     public ProcessorDistributor.ProcessorRegister<RemoteMessage> register() {
         return new ProcessorDistributor.ProcessorRegister<>(
                 new RegConfirmProcessor(),
-                new NotificationProcessor(),
+                new PushNotificationProcessor(),
                 new PushProcessor(),
                 new UpdateAvailableProcessor()
         );
@@ -30,21 +31,15 @@ public class FcmProcessorDistributor extends FirebaseMessagingService implements
         System.out.println("MESSAGE RECEIVED");
         Log.d("FcmListenerService", "From: " + remoteMessage.getFrom());
 
-        replaceUmlaute(remoteMessage);
+        replaceUmlauts(remoteMessage);
         String action = remoteMessage.getData().get("action");
         new ProcessorDistributor<>(this).distribute(action, remoteMessage, this);
     }
 
-    private static void replaceUmlaute(RemoteMessage remoteMessage) {
+    private static void replaceUmlauts(RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
         for (Map.Entry<String, String> entry : data.entrySet()) {
-            data.put(entry.getKey(), replaceUmlaute(entry.getValue()));
+            data.put(entry.getKey(), App.decodeUmlauts(entry.getValue()));
         }
-    }
-
-    private static String replaceUmlaute(String s) {
-        return s.replace("ae", "ä").replace("ue", "ü").replace("oe", "ö")
-                .replace("Ae", "Ä").replace("Ue", "Ü").replace("Oe", "Ö")
-                .replace("s_z", "ß");
     }
 }

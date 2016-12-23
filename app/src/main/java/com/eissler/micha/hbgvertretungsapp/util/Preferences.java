@@ -1,4 +1,4 @@
-package com.eissler.micha.hbgvertretungsapp;
+package com.eissler.micha.hbgvertretungsapp.util;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -44,11 +44,11 @@ public class Preferences implements SharedPreferences {
         PUSH_NOTIFICATION_SWITCH("push_notifications"),
         ALARM_TIME_1("time_for_alarm_1"),
         ALARM_TIME_2("time_for_alarm_2"),
-//        SHOW_STAR_INFO("show_star_info"),
-//        SHOW_INFO("show_batterysaver_info"),
         WHITELIST_SWITCH("whitelist_switch"),
-        ALARM_WAKEUP("alarm_wake_up")
-        ;
+        ALARM_WAKEUP("alarm_wake_up"),
+        TEST_PUSH_PROMPTED("test_push_prompted"),
+        AUTO_NAME("auto_name_subjects"),
+        AUTO_NAME_PATTERN("auto_name_pattern");
 
         private String key;
 

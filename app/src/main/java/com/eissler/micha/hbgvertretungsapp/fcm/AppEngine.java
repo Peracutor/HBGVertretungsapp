@@ -1,5 +1,7 @@
 package com.eissler.micha.hbgvertretungsapp.fcm;
 
+import android.os.AsyncTask;
+
 import com.google.api.client.googleapis.services.json.AbstractGoogleJsonClient;
 
 /**
@@ -25,4 +27,33 @@ public class AppEngine {
         //noinspection unchecked
         return (T) builder.build();
     }
+
+
+    public static class Task<T extends AbstractGoogleJsonClient> extends AsyncTask<Void, Void, Void> {
+
+        private Consumer<T> consumer;
+        private AbstractGoogleJsonClient.Builder builder;
+        private T client;
+
+        public Task(AbstractGoogleJsonClient.Builder builder, Consumer<T> consumer) {
+            this.consumer = consumer;
+            this.builder = builder;
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            if (client == null) {
+                client = AppEngine.getApiInstance(builder);
+            }
+
+            consumer.accept(client);
+            return null;
+        }
+    }
+
+    @FunctionalInterface
+    public interface Consumer<T> {
+        void accept(T var1);
+    }
+
 }

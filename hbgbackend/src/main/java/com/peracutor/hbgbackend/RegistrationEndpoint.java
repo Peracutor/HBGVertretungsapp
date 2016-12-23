@@ -13,8 +13,11 @@ import com.google.api.server.spi.config.ApiNamespace;
 import com.google.api.server.spi.config.Nullable;
 import com.google.api.server.spi.response.CollectionResponse;
 import com.googlecode.objectify.cmd.QueryExecute;
+import com.peracutor.hbgserverapi.CoverMessage;
+import com.peracutor.hbgserverapi.SortedCoverMessages;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -24,22 +27,22 @@ import static com.peracutor.hbgbackend.OfyService.ofy;
 
 /**
  * A registration endpoint class we are exposing for a device's GCM registration id on the backend
- *
+ * <p>
  * For more information, see
  * https://developers.google.com/appengine/docs/java/endpoints/
- *
+ * <p>
  * NOTE: This endpoint does not use any form of authorization or
  * authentication! If this app is deployed, anyone can access this endpoint! If
  * you'd like to add authentication, take a look at the documentation.
  */
 @Api(
-  name = "registration",
-  version = "v1",
-  namespace = @ApiNamespace(
-    ownerDomain = "hbgbackend.peracutor.com",
-    ownerName = "hbgbackend.peracutor.com",
-    packagePath=""
-  )
+        name = "registration",
+        version = "v1",
+        namespace = @ApiNamespace(
+                ownerDomain = "hbgbackend.peracutor.com",
+                ownerName = "hbgbackend.peracutor.com",
+                packagePath = ""
+        )
 )
 public class RegistrationEndpoint {
 
@@ -53,7 +56,7 @@ public class RegistrationEndpoint {
     @ApiMethod(name = "registerDevice")
     public void registerDevice(@Named("registrationId") String regId, @Named("acraId") String acraId) {
         log.info("Register request came in");
-        if(findRecord(regId) != null) {
+        if (findRecord(regId) != null) {
             log.info("Device " + regId + " already registered, skipping register");
             sendConfirmation(regId);
             return;
@@ -76,7 +79,7 @@ public class RegistrationEndpoint {
     private void sendConfirmation(String regId) {
         log.info("RegistrationEndpoint.sendConfirmation");
         try {
-            new MessagingEndpoint().sendMessageTo(regId, new Message.Builder().addData(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_REG_CONFIRM).build());
+            MessagingEndpoint.sendMessageTo(regId, new Message.Builder().addData(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_REG_CONFIRM).build());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -90,7 +93,7 @@ public class RegistrationEndpoint {
     @ApiMethod(name = "unregister")
     public void unregisterDevice(@Named("regId") String regId) {
         RegistrationRecord record = findRecord(regId);
-        if(record == null) {
+        if (record == null) {
             log.info("Device " + regId + " not registered, skipping unregister");
             return;
         }
@@ -125,6 +128,16 @@ public class RegistrationEndpoint {
         return collectionResponse;
     }
 
+    @ApiMethod(name = "showSavedSubjects")
+    public CollectionResponse<String> showSavedSubjects(@Named("classNumber") int classNumber) {
+        SortedCoverMessages sortedCoverMessages = SavedMessages.load(classNumber);
+        ArrayList<String> items = new ArrayList<>(sortedCoverMessages.size());
+        for (CoverMessage coverMessage : sortedCoverMessages) {
+            items.add(coverMessage.toString());
+        }
+        return new CollectionResponse.Builder<String>().setItems(items).build();
+    }
+
     private RegistrationRecord findRecord(String regId) {
         return ofy().load().type(RegistrationRecord.class).filter("regId", regId).first().now();
     }
@@ -146,7 +159,7 @@ public class RegistrationEndpoint {
             @Override
             public String getVersionDescription() { //http://unicode-table.com
                 return "Was neu ist:\n" +
-                        "- automatisches Senden von Bugreports" +
+                        "- automatisches Senden von Bugreports\n" +
                         "- Bugfixes\n";
 
 

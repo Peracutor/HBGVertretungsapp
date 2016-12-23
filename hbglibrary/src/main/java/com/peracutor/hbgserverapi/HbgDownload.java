@@ -12,35 +12,36 @@ import java.nio.charset.Charset;
  * 14.11.2016
  */
 public abstract class HbgDownload<T> implements HtmlDownloadHandler {
-    private String URL;
+    private String url;
+    private HtmlDownloadHandler downloadHandler;
 
-    public HbgDownload(String URL) {
-        setUrl(URL);
+    public HbgDownload(String url) {
+        setUrl(url);
+        downloadHandler = this;
+    }
+
+    public HbgDownload(String url, HtmlDownloadHandler downloadHandler) {
+        setUrl(url);
+        this.downloadHandler = downloadHandler;
     }
 
     public String getUrl() {
-        return URL;
+        return url;
     }
 
     public void setUrl(String URL) {
-        this.URL = URL;
+        this.url = URL;
     }
 
     public void executeAsync(final ResultCallback<T> callback) {
-        System.out.println("starting evaluation");
-        asyncDownload(getUrl(), Charset.forName("ISO-8859-15"), new ResultCallback<String>() {
+        downloadHandler.asyncDownload(getUrl(), Charset.forName("ISO-8859-1"), new ResultCallback<String>() {
             @Override
             public void onError(Throwable t) {
-                System.out.println("ERROR");
-//                if (t instanceof FileNotFoundException) {
-//                    callback.onResult(null); // no data for this week
-//                } else
                 callback.onError(onException((Exception) t));
             }
 
             @Override
             public void onResult(String htmlText) {
-                System.out.println("SUCCESS");
                 callback.onResult(evaluate(htmlText));
             }
         });
@@ -50,7 +51,7 @@ public abstract class HbgDownload<T> implements HtmlDownloadHandler {
     public T executeSync() throws Exception {
         String htmlText;
         try {
-            htmlText = syncDownload(getUrl(), Charset.forName("ISO-8859-15"));
+            htmlText = downloadHandler.syncDownload(getUrl(), Charset.forName("ISO-8859-1"));
         } catch (IOException e) {
             throw onException(e);
         }
@@ -60,11 +61,11 @@ public abstract class HbgDownload<T> implements HtmlDownloadHandler {
 
     @Override
     public void asyncDownload(String urlString, Charset charset, ResultCallback<String> callback) {
-        throw new RuntimeException("asyncDownload() must be overridden and implement asynchronous download-logic with ResultCallback");
+        throw new RuntimeException("implement your asynchronous download-logic by overriding asyncDownload() or passing a HtmlDownloadHandler");
     }
 
     @Override
-    public String syncDownload(String urlString, Charset charset) throws IOException {
+    public String syncDownload(String urlString, Charset charset) throws Exception {
         java.net.URL url = new URL(urlString);
         URLConnection con = url.openConnection();
         Reader r = new InputStreamReader(con.getInputStream(), charset);

@@ -18,7 +18,17 @@ public class Event {
         }
     }
 
-    public static class LoadPermissionRequest {}
+    public static class LoadPermissionRequest {
+        private final int sender;
+
+        public LoadPermissionRequest(int sender) {
+            this.sender = sender;
+        }
+
+        public int getSender() {
+            return sender;
+        }
+    }
 
 
 

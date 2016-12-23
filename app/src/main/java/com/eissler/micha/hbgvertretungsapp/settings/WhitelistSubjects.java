@@ -3,11 +3,12 @@ package com.eissler.micha.hbgvertretungsapp.settings;
 import com.eissler.micha.hbgvertretungsapp.R;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
-public class WhitelistSubjects extends SubjectListActivity {
+public class WhitelistSubjects extends SubjectListActivity<SimpleTextItem> {
 
     private Whitelist whitelist;
-
 
     @Override
     protected void initialize() {
@@ -15,13 +16,12 @@ public class WhitelistSubjects extends SubjectListActivity {
     }
 
     @Override
-    protected SubjectListAdapter getSubjectListAdapter() {
-        return new WhiteListAdapter();
-    }
-
-    @Override
-    protected ArrayList<String> getData() {
-        return whitelist;
+    protected List<SimpleTextItem> getItems() {
+        ArrayList<SimpleTextItem> items = new ArrayList<>(whitelist.size());
+        for (String subject : whitelist) {
+            items.add(new SimpleTextItem(subject, fastAdapter));
+        }
+        return items;
     }
 
     @Override
@@ -30,40 +30,20 @@ public class WhitelistSubjects extends SubjectListActivity {
     }
 
     @Override
-    protected void removeFromData(ArrayList<Integer> indices) {
-        for (int index : indices) {
-            whitelist.set(index, null); //null elements are removed when saving
+    protected void removeFromData(Set<SimpleTextItem> selectedItems) {
+        for (SimpleTextItem item : selectedItems) {
+            whitelist.set(whitelist.indexOf(item.getText()), null); //null elements are removed when saving
         }
-    }
-
-    @Override
-    protected void saveData() {
         whitelist.save();
     }
 
     @Override
-    protected boolean showCheckBoxesConstantly() {
-        return true;
+    protected SimpleTextItem getNoItemsItem() {
+        return new SimpleTextItem("Keine Fächer gespeichert - Es wird dir keine einzige Meldung angezeigt werden!", fastAdapter);
     }
 
     @Override
     protected int getLabelResource() {
         return R.string.whitelist_label;
-    }
-
-    class WhiteListAdapter extends SubjectListAdapter {
-        public WhiteListAdapter() {
-            super(whitelist, WhitelistSubjects.this);
-        }
-
-        @Override
-        protected String getNoItemsString() {
-            return "Keine Fächer gespeichert - Es wird dir keine einzige Meldung angezeigt werden!";
-        }
-
-        @Override
-        public boolean isSelectionMode() {
-            return true;
-        }
     }
 }

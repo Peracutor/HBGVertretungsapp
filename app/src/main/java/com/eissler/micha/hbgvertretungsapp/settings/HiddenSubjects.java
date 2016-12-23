@@ -1,57 +1,44 @@
 package com.eissler.micha.hbgvertretungsapp.settings;
 
-import android.view.View;
-import android.widget.TextView;
-
 import com.eissler.micha.hbgvertretungsapp.FilterDialog;
 import com.eissler.micha.hbgvertretungsapp.R;
+import com.mikepenz.fastadapter.FastAdapter;
 
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.List;
+import java.util.Set;
 
 
-public class HiddenSubjects extends SubjectListActivity {
+public class HiddenSubjects extends SubjectListActivity<SimpleTextItem> {
 
-    CustomNames customNames;
+    private Blacklist blacklist;
 
     @Override
     protected void initialize() {
-        customNames = CustomNames.get(getApplicationContext());
-    }
-
-    @Override
-    protected SubjectListAdapter getSubjectListAdapter() {
-        return new HiddenSubjectsAdapter();
-    }
-
-    @Override
-    protected ArrayList<String> getData() {
-        ArrayList<String> data = new ArrayList<>(12);
-
-        for (Map.Entry<String, String> entry : customNames.entrySet()) {
-            if (entry.getValue().equals("Nicht anzeigen")) {
-                data.add(entry.getKey());
-            }
-        }
-        return data;
+        blacklist = Blacklist.get(getApplicationContext());
     }
 
     @Override
     protected void addToData(String subject) {
-        customNames.put(subject, "Nicht anzeigen");
+        blacklist.add(subject);
+        blacklist.save();
     }
 
     @Override
-    protected void removeFromData(ArrayList<Integer> indices) {
-        ArrayList<String> data = getData();
-        for (Integer index : indices) {
-            customNames.remove(data.get(index));
+    protected void removeFromData(Set<SimpleTextItem> selectedItems) {
+        for (SimpleTextItem item : selectedItems) {
+            blacklist.set(blacklist.indexOf(item.getText()), null); //null elements are removed when saving
         }
+        blacklist.save();
     }
 
     @Override
-    protected void saveData() {
-        customNames.save();
+    protected List<SimpleTextItem> getItems() {
+        ArrayList<SimpleTextItem> items = new ArrayList<>(blacklist.size());
+        for (String subject : blacklist) {
+            items.add(new SimpleTextItem(subject, fastAdapter));
+        }
+        return items;
     }
 
     @Override
@@ -59,53 +46,16 @@ public class HiddenSubjects extends SubjectListActivity {
         return R.string.label_hidden_subjects;
     }
 
+    @Override
+    protected SimpleTextItem getNoItemsItem() {
+        return new SimpleTextItem("Es werden alle Kurse angezeigt", fastAdapter);
+    }
 
-//            listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-//                @Override
-//                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-//                    String originalSubject = parent.getItemAtPosition(position).toString();
-//                    System.out.println("originalSubject = " + originalSubject);
-//                    new FilterDialog("Nicht anzeigen", originalSubject, customNames,
-//                            new FilterDialog.PostExecuteInterface() {
-//                                @Override
-//                                public void onPostExecute() {
-//                                    HiddenSubjects.this.setAdapter();
-//                                }
-//                            },
-//                            HiddenSubjects.this).show(false);
-//
-//                }
-//            });
-//        }
-
-    class HiddenSubjectsAdapter extends SubjectListAdapter {
-        public HiddenSubjectsAdapter() {
-            super(getData(), HiddenSubjects.this);
-        }
-
-        @Override
-        protected String getNoItemsString() {
-            return "Es werden alle Kurse angezeigt";
-        }
-
-        @Override
-        protected View.OnClickListener getNonSelectiveListener() {
-            return new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    String originalSubject = ((TextView) view.findViewById(R.id.textView)).getText().toString();
-                    System.out.println("originalSubject = " + originalSubject);
-                    new FilterDialog("Nicht anzeigen", originalSubject, customNames,
-                            new FilterDialog.PostExecuteInterface() {
-                                @Override
-                                public void onPostExecute() {
-                                    updateList();
-                                }
-                            },
-                            HiddenSubjects.this).show(false);
-
-                }
-            };
-        }
+    @Override
+    protected FastAdapter.OnClickListener<SimpleTextItem> getOnClickListener() {
+        return (v, adapter, item, position) -> {
+            new FilterDialog(item.getText(), null, HiddenSubjects.this, HiddenSubjects.this::updateList).show(false);
+            return true;
+        };
     }
 }

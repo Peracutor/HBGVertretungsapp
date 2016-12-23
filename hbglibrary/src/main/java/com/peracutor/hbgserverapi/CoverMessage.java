@@ -3,7 +3,6 @@ package com.peracutor.hbgserverapi;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Locale;
 
 /**
@@ -21,13 +20,13 @@ public class CoverMessage implements HBGMessage {
     public final static int ROOM = 4;
     public final static int KIND = 5;
     public final static int COVER_TEXT = 6;
-//    public final static int CLASS = 7;
+    public final static int CLASS = 7;
 
     private static final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
 
     private String[] msgFields;
-    private Date concernedDate;
     protected int year;
+    private long concernedDateMillis;
 
     @SuppressWarnings("unused")
     private CoverMessage() {
@@ -36,15 +35,47 @@ public class CoverMessage implements HBGMessage {
 
     public CoverMessage(CoverMessage coverMessage) {
         msgFields = coverMessage.msgFields;
-        concernedDate = coverMessage.concernedDate;
+        concernedDateMillis = coverMessage.concernedDateMillis;
         year = coverMessage.year;
     }
 
     public CoverMessage(Builder coverMessageBuilder) {
         year = coverMessageBuilder.year;
         msgFields = coverMessageBuilder.msgFields;
+        init();
     }
 
+    private void init() {
+        Calendar concernedCal = Calendar.getInstance();
+        concernedCal.set(Calendar.SECOND, 0);
+        concernedCal.set(Calendar.YEAR, year);
+
+        Calendar concernedDay = Calendar.getInstance();
+        try {
+            concernedDay.setTime(SHORT_SDF.parse(get(DATE)));
+        } catch (ParseException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        concernedCal.set(Calendar.MONTH, concernedDay.get(Calendar.MONTH));
+        concernedCal.set(Calendar.DAY_OF_MONTH, concernedDay.get(Calendar.DAY_OF_MONTH));
+
+        String hour = get(HOUR);
+        if (hour.equals("?")) {
+            concernedCal.set(Calendar.HOUR_OF_DAY, 23);
+            concernedCal.set(Calendar.MINUTE, 59);
+            concernedDateMillis = concernedCal.getTimeInMillis();
+            return;
+        }
+        int classHour = getBeginningHour(hour);
+        Calendar endOfClassCal = Calendar.getInstance();
+        endOfClassCal.setTime(EndOfClass.get(classHour));
+
+        concernedCal.set(Calendar.HOUR_OF_DAY, endOfClassCal.get(Calendar.HOUR_OF_DAY));
+        concernedCal.set(Calendar.MINUTE, endOfClassCal.get(Calendar.MINUTE));
+        concernedDateMillis = concernedCal.getTimeInMillis();
+    }
 
     public static class Builder {
         private final int year;
@@ -70,6 +101,32 @@ public class CoverMessage implements HBGMessage {
 
     public void set(int index, String field) {
         msgFields[index] = field;
+    }
+
+    public Calendar getConcernedDate() {
+        Calendar concernedCal = Calendar.getInstance();
+        concernedCal.setTimeInMillis(concernedDateMillis);
+        return concernedCal;
+    }
+
+    private static int getBeginningHour(String hour) {
+        hour = hour.replace(".", "");
+
+        int index = hour.indexOf("-");
+        if (index == -1) {
+            return Integer.parseInt(hour.trim());
+        }
+        return Integer.parseInt(hour.substring(0, index).trim());
+    }
+
+    private static int getEndingHour(String hour) {
+        hour = hour.replace(".", "");
+
+        int index = hour.indexOf("-");
+        if (index == -1) {
+            return Integer.parseInt(hour.trim());
+        }
+        return Integer.parseInt(hour.substring(index + 1).trim());
     }
 
     public boolean tryMerge(CoverMessage message) {
@@ -133,75 +190,16 @@ public class CoverMessage implements HBGMessage {
         return true;
     }
 
-    public Calendar getConcernedDate() {
-        Calendar concernedCal = Calendar.getInstance();
-        if (concernedDate == null) {
-            concernedCal.set(Calendar.SECOND, 0);
-            concernedCal.set(Calendar.YEAR, year);
-
-            Calendar concernedDay = Calendar.getInstance();
-            try {
-                concernedDay.setTime(SHORT_SDF.parse(get(DATE)));
-            } catch (ParseException e) {
-                e.printStackTrace();
-                System.exit(1);
-            }
-
-            concernedCal.set(Calendar.MONTH, concernedDay.get(Calendar.MONTH));
-            concernedCal.set(Calendar.DAY_OF_MONTH, concernedDay.get(Calendar.DAY_OF_MONTH));
-
-            String hour = get(HOUR);
-            if (hour.equals("?")) {
-                concernedCal.set(Calendar.HOUR_OF_DAY, 23);
-                concernedCal.set(Calendar.MINUTE, 59);
-                return concernedCal;
-            }
-            int classHour = getBeginningHour(hour);
-            Calendar endOfClassCal = Calendar.getInstance();
-            endOfClassCal.setTime(EndOfClass.get(classHour));
-
-            concernedCal.set(Calendar.HOUR_OF_DAY, endOfClassCal.get(Calendar.HOUR_OF_DAY));
-            concernedCal.set(Calendar.MINUTE, endOfClassCal.get(Calendar.MINUTE));
-            concernedDate = concernedCal.getTime();
-        } else {
-            concernedCal.setTime(concernedDate);
-        }
-
-        return concernedCal;
-    }
-
-    private static int getBeginningHour(String hour) {
-        hour = hour.replace(".", "");
-
-        int index = hour.indexOf("-");
-        if (index == -1) {
-            return Integer.parseInt(hour.trim());
-        }
-        return Integer.parseInt(hour.substring(0, index).trim());
-    }
-
-    private static int getEndingHour(String hour) {
-        hour = hour.replace(".", "");
-
-        int index = hour.indexOf("-");
-        if (index == -1) {
-            return Integer.parseInt(hour.trim());
-        }
-        return Integer.parseInt(hour.substring(index + 1).trim());
-    }
-
     @SuppressWarnings("CloneDoesntCallSuperClone")
     @Override
     public CoverMessage clone() {
         Builder copyBuilder = new Builder(year);
-        for (int i = 0; i < SIZE; i++) {
-            copyBuilder.setField(i, get(i));
-        }
+        System.arraycopy(msgFields, 0, copyBuilder.msgFields, 0, SIZE);
         return new CoverMessage(copyBuilder);
     }
 
     @Override
-    public String toString() {
+    public final String toString() {
 //        StringBuilder stringBuilder = new StringBuilder(SIZE);
 //        stringBuilder.append("Message(").append(year).append(", ").append(SHORT_SDF.format(concernedDate)).append("): ");
 //        for (int i = 0; i < SIZE; i++) {

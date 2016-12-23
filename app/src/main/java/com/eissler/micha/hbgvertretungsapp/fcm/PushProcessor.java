@@ -6,16 +6,19 @@ import android.support.v4.app.NotificationCompat;
 
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.NotificationService;
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
-import com.eissler.micha.hbgvertretungsapp.evaluation.CustomNameReplacer;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.RequestCodes;
 import com.google.firebase.messaging.RemoteMessage;
 import com.peracutor.hbgserverapi.CoverMessage;
 import com.peracutor.hbgserverapi.HBGMessage;
+import com.peracutor.hbgserverapi.Replacer;
 import com.peracutor.hbgserverapi.SortedCoverMessages;
 
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -37,7 +40,7 @@ public class PushProcessor extends ProcessorDistributor.Processor<RemoteMessage>
     }
 
     @Override
-    public void process(RemoteMessage remoteMessage) { // TODO: 22.11.2016 test PushNotifications again
+    public void process(RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
 
         if (messageQueue == null) {
@@ -58,28 +61,25 @@ public class PushProcessor extends ProcessorDistributor.Processor<RemoteMessage>
         System.out.println("Message " + messageQueue.size() +" received");
 
         System.out.println("countDownRunning = " + countDownRunning);
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (!countDownRunning) {
-                    countDownRunning = true;
+        new Thread(() -> {
+            if (!countDownRunning) {
+                countDownRunning = true;
 
-                    System.out.println("Start countdown");
-                    System.out.print("Waiting ");
-                    for (; counter < QUEUE_TIMEOUT_SECONDS; counter++) {
-                        System.out.print(counter + ", ");
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                System.out.println("Start countdown");
+                System.out.print("Waiting ");
+                for (; counter < QUEUE_TIMEOUT_SECONDS; counter++) {
+                    System.out.print(counter + ", ");
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
-                    System.out.print("\n");
-                    fireNotifications();
-                    countDownRunning = false;
-                    counter = 0;
-
                 }
+                System.out.print("\n");
+                fireNotifications();
+                countDownRunning = false;
+                counter = 0;
+
             }
         }).start();
         if (countDownRunning) {
@@ -90,26 +90,32 @@ public class PushProcessor extends ProcessorDistributor.Processor<RemoteMessage>
 
     private synchronized void fireNotifications() {
         System.out.println("FIRE NOTIFICATIONS");
-        CustomNameReplacer replacer = new CustomNameReplacer(getContext());
-        ArrayList<HBGMessage> listItems = messageQueue.getListItems(replacer);
+
+        Replacer replacer = App.getReplacer(getContext());
+        ArrayList<HBGMessage> listItems = messageQueue.getListItems(App.getCoverMessageFilter(getContext()), replacer);
+        if (listItems.size() == 0) {
+            //no messages to be shown
+            return;
+        }
 
         NotificationCompat.InboxStyle inboxStyle = NotificationService.formatToInbox(listItems, "   ", messageQueue.size() + " neue Meldung" + (messageQueue.size() > 1 ? "en" : ""));
 
-        NotificationCompat.Builder notificationBuilder = null;
         try {
-            notificationBuilder = App.getIntentNotificationBuilder(getContext())
+            SimpleDateFormat sdf = new SimpleDateFormat("EE", Locale.GERMANY);
+            SimpleDateFormat sdf2 = new SimpleDateFormat("dd.MM.yy", Locale.GERMANY);
+            NotificationCompat.Builder notificationBuilder = App.getIntentNotificationBuilder(getContext())
                     .setContentTitle("Push-Benachrichtigung")
-                    .setContentText(App.DAY_NAME_SDF.format(App.NORMAL_SDF.parse(messageQueue.getDays().get(0) + Calendar.getInstance().get(Calendar.YEAR))) + ": " + replacer.replace(messageQueue.get(0)).toString() + (messageQueue.size() > 1 ? " (+" + (messageQueue.size() - 1) + " weitere)" : "") )
+                    .setContentText(sdf.format(sdf2.parse(messageQueue.getDays().get(0) + Calendar.getInstance().get(Calendar.YEAR))) + ": " +
+                            replacer.replace(messageQueue.get(0)).toString() + (messageQueue.size() > 1 ? " (+" + (messageQueue.size() - 1) + " weitere)" : "") )
                     .setStyle(inboxStyle);
+
+            NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+
+            notificationManager.notify(RequestCodes.NOTIFICATION_PUSH, notificationBuilder.build());
         } catch (ParseException e) {
             e.printStackTrace();
+            App.reportUnexpectedException(e);
         }
-
-        NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-
-        assert notificationBuilder != null;
-        notificationManager.notify(0 /* ID of notification */, notificationBuilder.build());
-
         messageQueue.clear();
     }
 

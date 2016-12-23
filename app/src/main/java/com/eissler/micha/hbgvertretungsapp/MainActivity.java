@@ -2,11 +2,13 @@ package com.eissler.micha.hbgvertretungsapp;
 
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
@@ -28,14 +30,21 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.eissler.micha.hbgvertretungsapp.evaluation.DownloadHandler;
+import com.eissler.micha.hbgvertretungsapp.fcm.PushNotifications;
+import com.eissler.micha.hbgvertretungsapp.settings.AutoName;
+import com.eissler.micha.hbgvertretungsapp.settings.Blacklist;
+import com.eissler.micha.hbgvertretungsapp.settings.CustomNames;
 import com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity;
 import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
 import com.eissler.micha.hbgvertretungsapp.settings.WhitelistSubjects;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.google.firebase.iid.FirebaseInstanceId;
-import com.koushikdutta.async.future.FutureCallback;
-import com.koushikdutta.ion.Ion;
 import com.peracutor.hbgserverapi.DownloadException;
+import com.peracutor.hbgserverapi.HbgAsOfDateDownload;
+import com.peracutor.hbgserverapi.HbgClassListDownload;
 import com.peracutor.hbgserverapi.HbgDataDownload;
+import com.peracutor.hbgserverapi.ResultCallback;
 import com.viewpagerindicator.TitlePageIndicator;
 
 import org.greenrobot.eventbus.EventBus;
@@ -43,13 +52,13 @@ import org.greenrobot.eventbus.Subscribe;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import hugo.weaving.DebugLog;
 import tr.xip.errorview.ErrorView;
@@ -59,7 +68,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     //Object-filename
     private final static String CLASSES = "ClassSelectionArrayAdapter";
 
-    public static final long REFRESH_COUNTDOWN_MILLIS = 5 * 60 * 1000;
+    public static final long REFRESH_COUNTDOWN_MILLIS = 5* 60 * 1000; // FIXME: 18.12.2016
 
     private ListView classesList;
     private DrawerLayout drawerLayout;
@@ -79,7 +88,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Date lastReload;
     private Integer currentItem;
 
-    private Snackbar refreshSnack;
+//    private Snackbar refreshSnack;
 
     private final CountDownTimer refreshTimer = new CountDownTimer(REFRESH_COUNTDOWN_MILLIS, REFRESH_COUNTDOWN_MILLIS) {
         @Override
@@ -89,7 +98,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         @Override
         public void onFinish() {
             System.out.println("TIMER FINISHED");
-            showRefreshSnack();
+            checkForNewData();
         }
     };
 
@@ -127,17 +136,17 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 //            System.out.println("getIntent().getDataString() = " + getIntent().getDataString());
 //        }
 
-        refreshOnClick = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onRefresh();
-            }
-        };
+//        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+//            System.out.println("UNCAUGHT EXCEPTION OCCURRED");
+//            App.exitWithError(e);
+//        });
 
-        refreshSnack = Snackbar.make(findViewById(android.R.id.content), "", Snackbar.LENGTH_SHORT)
-                .setAction(R.string.act_ma_refresh, refreshOnClick)
-                .setActionTextColor(Color.YELLOW)
-                .setDuration(5000);
+        refreshOnClick = v -> onRefresh();
+
+//        refreshSnack = Snackbar.make(findViewById(android.R.id.content), "", Snackbar.LENGTH_SHORT)
+//                .setAction(R.string.act_ma_refresh, refreshOnClick)
+//                .setActionTextColor(Color.YELLOW)
+//                .setDuration(5000);
 
         App.logCodeSection("ViewAssignment");
 
@@ -280,6 +289,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 editor.apply();
 
                 Notifications.newInstance(this).enable();
+                PushNotifications.newInstance(this).subscribeToClassNumber();
 
 
 //                ACRA.getErrorReporter().handleSilentException(new Exception("App wurde das erste Mal gestartet")); // TODO: 18.04.2016 App wurde erstes mal gestartet - ACRA Meldung deaktiviert
@@ -290,7 +300,29 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                 if (lastSavedApk.getVersion()== thisVersion && lastSavedApk.exists()) {
                     lastSavedApk.deleteWithToast(this);
                 }
-//                ACRA.getErrorReporter().handleSilentException(new Exception("App-Update wurde installiert"));
+                PushNotifications.newInstance(this).subscribeToClassNumber();
+
+                System.out.println("INITIALIZING BLACKLIST");
+                CustomNames customNames = CustomNames.get(this);
+                Blacklist blacklist = Blacklist.get(this);
+
+                System.out.println("customNames = " + customNames);
+                System.out.println("blacklist = " + blacklist);
+                List<String> keysToRemove = new ArrayList<>();
+                for (Map.Entry<String, String> entry : customNames.entrySet()) {
+                    if (entry.getValue().equals("Nicht anzeigen")) {
+                        keysToRemove.add(entry.getKey()); //else ConcurrentModificationException is thrown
+                        blacklist.add(entry.getKey());
+                    }
+                }
+                for (String key : keysToRemove) {
+                    customNames.remove(key);
+                }
+                blacklist.save();
+                customNames.save();
+                System.out.println("customNames = " + customNames);
+                System.out.println("blacklist = " + blacklist);
+                //                ACRA.getErrorReporter().handleSilentException(new Exception("App-Update wurde installiert"));
             }
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
@@ -325,8 +357,26 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         }
     }
 
-    private void showRefreshSnack() {
-        refreshSnack.setText(getString(R.string.act_ma_last_reload) + new SimpleDateFormat("HH:mm", Locale.GERMANY).format(lastReload)).show();
+    private void checkForNewData() {
+        new HbgAsOfDateDownload(new DownloadHandler(this)).executeAsync(new ResultCallback<Date>() {
+            @Override
+            public void onError(Throwable t) {
+                Snackbar refreshSnack = Snackbar.make(findViewById(android.R.id.content), "", Snackbar.LENGTH_SHORT)
+                        .setAction(R.string.act_ma_refresh, refreshOnClick)
+                        .setActionTextColor(Color.YELLOW)
+                        .setDuration(5000);
+                refreshSnack.setText(getString(R.string.act_ma_last_reload) + new SimpleDateFormat("HH:mm", Locale.GERMANY).format(lastReload)).show();
+            }
+
+            @Override
+            public void onResult(Date asOf) {
+                System.out.print("As of date: ");
+                System.out.println(new SimpleDateFormat("EE HH:mm:ss dd.MM.yy", Locale.GERMANY).format(asOf));
+                if (lastReload.before(asOf)) {
+                    onRefresh();
+                }
+            }
+        });
     }
 
     @Override
@@ -348,7 +398,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         resetPager();
         if (App.isMillisecondsLater(lastReload, REFRESH_COUNTDOWN_MILLIS)) {
-            showRefreshSnack();
+            checkForNewData();
         }
     }
 
@@ -389,20 +439,42 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             case R.id.show_in_webbrowser:
                 Log.d(HbgApplication.HBG_APP, "Show in browser - Button clicked");
 
-                if (HbgPagerAdapter.availableWeeks != null) {
-                    int weekNumber = HbgPagerAdapter.availableWeeks.get(pager.getCurrentItem());
-                    int classNum = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
-                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(HbgDataDownload.makeURL(weekNumber, classNum)));
-                    startActivity(browserIntent);
-                } else {
-                    Toast.makeText(MainActivity.this, R.string.act_ma_no_week_selected, Toast.LENGTH_LONG).show();
-                }
+                Toast.makeText(MainActivity.this, R.string.act_ma_open_in_browser, Toast.LENGTH_SHORT).show();
+
+                HbgPagerAdapter.getAvailableWeeks(availableWeeks -> {
+                    int weekNumber = availableWeeks.get(pager.getCurrentItem());
+
+                    Intent dummyIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://"));
+                    ResolveInfo resolveInfo = getPackageManager().resolveActivity(dummyIntent, PackageManager.MATCH_DEFAULT_ONLY);
+                    // This is the default browser's packageName
+                    String packageName = resolveInfo.activityInfo.packageName;
+
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(HbgDataDownload.makeURL(weekNumber, getSelectedClass())));
+                    browserIntent.setPackage(packageName);
+
+                    try {
+                        startActivity(browserIntent);
+                    } catch (ActivityNotFoundException e) {
+                        browserIntent.setPackage(Intent.createChooser(dummyIntent, "Browser wählen").getPackage());
+                        try {
+                            startActivity(browserIntent);
+                        } catch (ActivityNotFoundException e1) {
+                            e1.printStackTrace();
+                            browserIntent.setPackage(null);
+                            startActivity(browserIntent);
+                        }
+                    }
+                });
 
                 break;
             default:
                 break;
         }
         return true;
+    }
+
+    public int getSelectedClass() {
+        return prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
     }
 
     void resetPager() {
@@ -433,26 +505,20 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         errorView.setSubtitle(errorMessage);
         errorView.setRetryButtonText(buttonText);
-        errorView.setOnRetryListener(new ErrorView.RetryListener() {
-            @Override
-            public void onRetry() {
-                Toast.makeText(MainActivity.this, R.string.act_ma_refreshing, Toast.LENGTH_SHORT).show();
-                errorSolved();
-                onClickListener.onClick(null);
-            }
+        errorView.setOnRetryListener(() -> {
+            Toast.makeText(MainActivity.this, R.string.act_ma_refreshing, Toast.LENGTH_SHORT).show();
+            errorSolved();
+            onClickListener.onClick(null);
         });
     }
 
     private void errorSolved() {
         refreshTimer.start();
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                swipeRefreshLayout.setEnabled(true);
-                titleIndicator.setVisibility(View.VISIBLE);
-                errorView.setVisibility(View.GONE);
-                pager.setVisibility(View.VISIBLE);
-            }
+        runOnUiThread(() -> {
+            swipeRefreshLayout.setEnabled(true);
+            titleIndicator.setVisibility(View.VISIBLE);
+            errorView.setVisibility(View.GONE);
+            pager.setVisibility(View.VISIBLE);
         });
     }
 
@@ -464,9 +530,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @DebugLog
     @Override
     public void onRefresh() {
-        if (refreshSnack.isShown()) {
-            refreshSnack.dismiss();
-        }
+//        if (refreshSnack.isShown()) {
+//            refreshSnack.dismiss();
+//        }
         EventBus.getDefault().post(new Event.FinishActionMode());
 
         if (!swipeRefreshLayout.isRefreshing()) swipeRefreshLayout.setRefreshing(true);
@@ -474,6 +540,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         currentItem = pager.getCurrentItem();
         HbgPagerAdapter pagerAdapter = new HbgPagerAdapter(this);
         pager.setAdapter(pagerAdapter);
+        pager.setOffscreenPageLimit(10/*more than enough, just to make sure ^^ */);
         pager.setCurrentItem(currentItem);
         currentItem = null;
 
@@ -481,7 +548,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         refreshTimer.cancel();
         refreshTimer.start();
 
-        if (classesList.getAdapter().getCount() < 10) {
+        if (classesList.getAdapter().getCount() < 5) {
             prepareClassSelection(true);
         }
 //        swipeRefreshLayout.setRefreshing(false);
@@ -490,7 +557,10 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Subscribe
     public void onPermissionRequested(Event.LoadPermissionRequest permissionRequest) {
         System.out.println("Request received");
-        EventBus.getDefault().post(new Event.LoadPermission(currentItem != null ? currentItem : pager.getCurrentItem()));
+        int currentItem = this.currentItem != null ? this.currentItem : pager.getCurrentItem();
+        if (permissionRequest.getSender() == currentItem) {
+            EventBus.getDefault().post(new Event.LoadPermission(currentItem));
+        }
     }
 
 
@@ -527,44 +597,30 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return;
         }
 
-        Ion.with(this)
-                .load("http://vp.hbgym.de/frames/navbar.htm")
-                .noCache()
-                .asString(Charset.forName("ISO-8859-15"))
-                .setCallback(new FutureCallback<String>() {
-                    @Override
-                    public void onCompleted(Exception e, String html) {
-                        if (e != null) {
-                            classListError(DownloadException.getCorrespondingExceptionFor(e));
-                            return;
-                        }
+        new HbgClassListDownload(new DownloadHandler(this)).executeAsync(new ResultCallback<List<String>>() {
+            @Override
+            public void onError(Throwable t) {
+                classListError(DownloadException.getCorrespondingExceptionFor(t));
+            }
 
-                        int occ = html.indexOf("\"05a");
-                        String[] seq = html.substring(occ, occ + 350).split(";", 2);
-                        String[] classes = seq[0].split(",");
+            @Override
+            public void onResult(List<String> classList) {
+                classList.add(0, getString(R.string.act_ma_choose_class));
+                classList.add(getString(R.string.act_ma_refresh));
 
-                        for (int i = 0; !classes[i].contains("]") && i < classes.length - 1; i++) {
-                            classes[i] = classes[i].substring(1, classes[i].length() - 1);
-                        }
-                        classes[classes.length - 1] = classes[classes.length - 1].substring(1, classes[classes.length - 1].length() - 2);
-
-                        ArrayList<String> downloadedClassList = new ArrayList<>(Arrays.asList(classes));
-                        downloadedClassList.add(0, getString(R.string.act_ma_choose_class));
-                        downloadedClassList.add(getString(R.string.act_ma_refresh));
-
-                        try {
-                            App.writeObject(downloadedClassList, CLASSES, getBaseContext());
-                        } catch (Exception e1) {
-                            App.logError("Error writing object");
-                            App.reportUnexpectedException(e1);
-                            e1.printStackTrace();
-                        }
-                        setClasses(downloadedClassList);
-                    }
-                });
+                try {
+                    App.writeObject(classList, CLASSES, getBaseContext());
+                } catch (Exception e1) {
+                    App.logError("Error writing object");
+                    App.reportUnexpectedException(e1);
+                    e1.printStackTrace();
+                }
+                setClasses(classList);
+            }
+        });
     }
 
-    private void setClasses(ArrayList<String> classes) {
+    private void setClasses(List<String> classes) {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 MainActivity.this,
                 android.R.layout.simple_list_item_1,
@@ -572,7 +628,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
         classesList.setAdapter(adapter);
 
-        int classSelection = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
+        int classSelection = getSelectedClass();
         if (classSelection == 0) {
             drawerLayout.openDrawer(classesList);
         }
@@ -613,8 +669,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         EventBus.getDefault().post(new Event.FinishActionMode());
 
         String className = classesList.getItemAtPosition(position).toString();
-        final int previousSelection = prefs.getInt(Preferences.Key.SELECTED_CLASS, 0);
-        final boolean posChanged = position != previousSelection;
+        final int previousPosition = getSelectedClass();
+        final boolean posChanged = position != previousPosition;
 
         if (!className.equals(getString(R.string.act_ma_refresh))) {
             if (!className.equals("Wähle deine Klasse")) drawerLayout.closeDrawers();
@@ -626,42 +682,53 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             prepareClassSelection(true);
         } else if (posChanged && Whitelist.isWhitelistModeActive(this)) {
             final DialogInterface.OnClickListener listener;
-            App.dialog("Klassenauswahl", "Der Whitelist-Modus ist aktiv - eventuell solltest du die Fächer deiner Whitelist ändern!\n\nMöchtest du wirklich eine andere Klasse auswählen?", this)
-                    .setPositiveButton("Ja", listener = new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int which) {
-                            if (which == DialogInterface.BUTTON_NEGATIVE) {
-                                classesList.performItemClick(null, previousSelection, previousSelection);
-                                return;
-                            } else if (which == DialogInterface.BUTTON_NEUTRAL) {
-                                DialogInterface.OnClickListener listener2;
-                                App.dialog("Whitelist-Modus", "Möchtest du den Whitelist-Modus deaktivieren, oder die Fächer ändern?", MainActivity.this)
-                                        .setPositiveButton("Ändern", listener2 = new DialogInterface.OnClickListener() {
-                                            @Override
-                                            public void onClick(DialogInterface dialogInterface, int which) {
-                                                if (which == DialogInterface.BUTTON_POSITIVE) {
-                                                    startActivity(new Intent(MainActivity.this, WhitelistSubjects.class));
-                                                } else {
-                                                    Whitelist.enable(false, MainActivity.this);
-                                                    resetPager();
-                                                }
-                                            }
-                                        })
-                                        .setNegativeButton("Deaktivieren", listener2)
-                                        .show();
-                            }
-
-                            prefs.edit().putInt(Preferences.Key.SELECTED_CLASS, position).apply();
-                            onRefresh();
+            App.dialog("Klassenauswahl", "Der Whitelist-Modus ist aktiv - eventuell solltest du die Fächer deiner Whitelist ändern.\n\nMöchtest du wirklich eine andere Klasse auswählen?", this)
+                    .setPositiveButton("Ja", listener = (dialogInterface, which) -> {
+                        if (which == DialogInterface.BUTTON_NEGATIVE) {
+                            classesList.performItemClick(null, previousPosition, previousPosition);
+                            return;
+                        } else if (which == DialogInterface.BUTTON_NEUTRAL) {
+                            DialogInterface.OnClickListener listener2;
+                            App.dialog("Whitelist-Modus", "Möchtest du den Whitelist-Modus deaktivieren, oder die Fächer ändern?", MainActivity.this)
+                                    .setPositiveButton("Ändern", listener2 = (dialogInterface1, which1) -> {
+                                        if (which1 == DialogInterface.BUTTON_POSITIVE) {
+                                            startActivity(new Intent(MainActivity.this, WhitelistSubjects.class));
+                                        } else {
+                                            Whitelist.enable(false, MainActivity.this);
+                                            resetPager();
+                                        }
+                                    })
+                                    .setNegativeButton("Deaktivieren", listener2)
+                                    .show();
                         }
+
+                        changeClassSelection(position, previousPosition);
                     })
                     .setNegativeButton("Nein", listener)
                     .setNeutralButton("Whitelist ändern", listener)
                     .show();
         } else if (posChanged) {
-            prefs.edit().putInt(Preferences.Key.SELECTED_CLASS, position).apply();
-            onRefresh();
+            changeClassSelection(position, previousPosition);
         }
+    }
+
+    public void changeClassSelection(int position, int previousPosition) {
+        if (AutoName.isAutoNamingEnabled(this) && isOberstufe(position) != isOberstufe(previousPosition)) {
+            Preferences.Editor editor = Preferences.getDefaultPreferences(this).edit();
+            editor.putString(Preferences.Key.AUTO_NAME_PATTERN, "*f"); //set to default value
+            editor.putBoolean(Preferences.Key.AUTO_NAME, false);
+            editor.apply();
+            Toast.makeText(this, "Ausschreiben der Fachkürzel wurde deaktiviert", Toast.LENGTH_LONG).show();
+        }
+        prefs.edit().putInt(Preferences.Key.SELECTED_CLASS, position).apply();
+        onRefresh();
+        PushNotifications pushNotifications = PushNotifications.newInstance(this);
+        pushNotifications.deactivate();
+        pushNotifications.activate();
+    }
+
+    private boolean isOberstufe(int classNumber) {
+        return classNumber != 21 && classNumber != 22;
     }
 
     @Override
@@ -692,29 +759,21 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                     if (matches) {
                         path = path.substring(1, path.lastIndexOf('.')); //remove prefix "/" and appendix ".htm"
                         final int week = Integer.parseInt(path.substring(path.indexOf('/') + 1, path.lastIndexOf('/')));
-                        HbgPagerAdapter.getAvailableWeeks(new App.WaitFor<ArrayList<Integer>>() {
-                            @Override
-                            public void onResult(ArrayList<Integer> availablePages) {
-                                int index = availablePages.indexOf(week);
-                                if (index == -1) {
-                                    Toast.makeText(MainActivity.this, "Woche nicht verfügbar", Toast.LENGTH_LONG).show();
-                                    return;
-                                }
-                                pager.setCurrentItem(index);
+                        HbgPagerAdapter.getAvailableWeeks(availablePages -> {
+                            int index = availablePages.indexOf(week);
+                            if (index == -1) {
+                                Toast.makeText(MainActivity.this, "Woche nicht verfügbar", Toast.LENGTH_LONG).show();
+                                return;
                             }
+                            pager.setCurrentItem(index);
                         });
 
                         final int classNumber = Integer.parseInt(path.substring(path.length() - 3));
-                        if (classNumber != prefs.getInt(Preferences.Key.SELECTED_CLASS, 0)) {
+                        if (classNumber != getSelectedClass()) {
                             //noinspection unchecked
                             App.dialog("Link", "Der angeklickte Link ist für Klasse " + ((ArrayAdapter<String>) classesList.getAdapter()).getItem(classNumber) + ".\n\n" +
                                     "Diese Klasse jetzt auswählen?", this)
-                                    .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialogInterface, int i) {
-                                            classesList.performItemClick(null, classNumber, classNumber);
-                                        }
-                                    })
+                                    .setPositiveButton("Ja", (dialogInterface, i) -> classesList.performItemClick(null, classNumber, classNumber))
                                     .show();
                         }
                     }

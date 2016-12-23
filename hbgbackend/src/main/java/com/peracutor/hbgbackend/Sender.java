@@ -19,15 +19,13 @@ import static com.google.android.gcm.server.Constants.PARAM_COLLAPSE_KEY;
 import static com.google.android.gcm.server.Constants.PARAM_DELAY_WHILE_IDLE;
 import static com.google.android.gcm.server.Constants.PARAM_TIME_TO_LIVE;
 
-/**
- * Created by Micha on 13.06.2016.
- */
 public class Sender extends com.google.android.gcm.server.Sender {
     private static final String FCM_SEND_ENDPOINT = "https://fcm.googleapis.com/fcm/send";
     private static final String TOKEN_MESSAGE_ID = "message_id";
     private static final String PARAM_TO = "to";
     private static final String PARAM_DATA = "data";
-    private static final String PARAM_NOTIFICATION = "notification";
+    private static final String PARAM_CONDITION = "condition";
+    //    private static final String PARAM_NOTIFICATION = "notification";
     private String key;
 
     /**
@@ -41,6 +39,14 @@ public class Sender extends com.google.android.gcm.server.Sender {
     }
 
     public Result sendMessage(Message message, String to, int retries) throws IOException {
+        return sendMessage(message, to, PARAM_TO, retries);
+    }
+
+    public Result sendMessageMultipleTopics(Message message, String condition, int retries) throws IOException {
+        return sendMessage(message, condition, PARAM_CONDITION, retries);
+    }
+
+    public Result sendMessage(Message message, String target, String paramTarget, int retries) throws IOException {
         int attempt = 0;
         Result result;
         int backoff = BACKOFF_INITIAL_DELAY;
@@ -49,9 +55,9 @@ public class Sender extends com.google.android.gcm.server.Sender {
             attempt++;
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Attempt #" + attempt + " to send message " +
-                        message + " to regIds " + to);
+                        message + " to regIds " + target);
             }
-            result = sendMessageNoRetry(message, to);
+            result = sendMessageNoRetry(message, target, paramTarget);
             tryAgain = result == null && attempt <= retries;
             if (tryAgain) {
                 int sleepTime = backoff / 2 + random.nextInt(backoff);
@@ -77,9 +83,9 @@ public class Sender extends com.google.android.gcm.server.Sender {
     }
 
 
-    public Result sendMessageNoRetry(Message message, String to) throws IOException {
+    public Result sendMessageNoRetry(Message message, String target, String paramTarget) throws IOException {
         StringBuilder body = newBody();
-        addParameter(body, PARAM_TO, to, true);
+        addParameter(body, paramTarget, target, true);
 
         Map<String, String> data = message.getData();
         if (data != null) {

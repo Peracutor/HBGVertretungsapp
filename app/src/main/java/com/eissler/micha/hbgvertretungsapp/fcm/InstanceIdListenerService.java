@@ -4,15 +4,15 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.SystemClock;
+import android.support.annotation.NonNull;
 
 import com.eissler.micha.hbgvertretungsapp.AlarmReceiver;
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.ConnectivityChangeReceiver;
-import com.eissler.micha.hbgvertretungsapp.ExponentialBackoff;
-import com.eissler.micha.hbgvertretungsapp.Preferences;
-import com.eissler.micha.hbgvertretungsapp.ProcessorDistributor;
+import com.eissler.micha.hbgvertretungsapp.util.PreferenceExponentialBackoff;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.google.firebase.iid.FirebaseInstanceId;
@@ -25,9 +25,9 @@ import org.acra.util.Installation;
 
 import java.io.IOException;
 
-public class InstanceIdListenerService extends FirebaseInstanceIdService {
+import static com.eissler.micha.hbgvertretungsapp.util.Preferences.Key.REGISTER_CHECK_BACKOFF;
 
-    private static Registration sRegistration;
+public class InstanceIdListenerService extends FirebaseInstanceIdService {
 
 
     /**
@@ -54,7 +54,15 @@ public class InstanceIdListenerService extends FirebaseInstanceIdService {
 
         setRegisterCheckAlarm(context);
         String token = FirebaseInstanceId.getInstance().getToken();
-        new RegistrationTask().execute(token, Installation.id(context));
+        new AppEngine.Task<Registration>(new Registration.Builder(AndroidHttp.newCompatibleTransport(), new AndroidJsonFactory(), null), registration -> {
+            try {
+                registration.registerDevice(token, Installation.id(context)).execute();
+                System.out.println("FCM token sent to server");
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Registration-error: " + e.getMessage()); //will retry when alarm is launched
+            }
+        }).execute();
     }
 
     private static void setRegisterCheckAlarm(Context context) {
@@ -65,7 +73,7 @@ public class InstanceIdListenerService extends FirebaseInstanceIdService {
         intent.setAction("alarm.register_check");
         PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 3, intent, 0);
 
-        RegisterCheckBackoff backoff = new RegisterCheckBackoff(context);
+        PreferenceExponentialBackoff backoff = getRegisterCheckBackoff(context);
         if (backoff.retry()) {
             alarmManager.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + backoff.getValue(), pendingIntent);
         } else {
@@ -74,59 +82,9 @@ public class InstanceIdListenerService extends FirebaseInstanceIdService {
 
     }
 
-    private static class RegistrationTask extends AsyncTask<String, Void, String> {
-
-        @Override
-        protected String doInBackground(String... strings) {
-
-            if (sRegistration == null) {
-                sRegistration = AppEngine.getApiInstance(new Registration.Builder(AndroidHttp.newCompatibleTransport(), new AndroidJsonFactory(), null));
-            }
-
-
-            try {
-                String token = strings[0];
-                String acraID = strings[1];
-                System.out.println("token = " + token);
-                System.out.println("acraID = " + acraID);
-                sRegistration.registerDevice(token, acraID).execute();
-                return null;
-            } catch (IOException e) {
-                e.printStackTrace();
-                return e.getMessage();
-            }
-        }
-
-        @Override
-        protected void onPostExecute(String errorMessage) {
-//            Toast.makeText(InstanceIdListenerService.this, s, Toast.LENGTH_SHORT).show();
-            if (errorMessage != null) {
-                System.out.println("Registration-error: " + errorMessage); //will retry when alarm is launched
-            } else {
-                System.out.println("FCM token sent to server");
-            }
-        }
-    }
-
-    static class RegisterCheckBackoff extends ExponentialBackoff {
-        public RegisterCheckBackoff(Context context) {
-            super(context);
-        }
-
-        @Override
-        protected Preferences.Key getPreferenceName() {
-            return Preferences.Key.REGISTER_CHECK_BACKOFF;
-        }
-
-        @Override
-        protected long getStartValue() {
-            return 2 * 60 * 1000;
-        }
-
-        @Override
-        protected int getMaxRetries() {
-            return 8;
-        }
+    @NonNull
+    static PreferenceExponentialBackoff getRegisterCheckBackoff(Context context) {
+        return new PreferenceExponentialBackoff(2 * 60 * 1000, 2, 8, REGISTER_CHECK_BACKOFF.getKey(), Preferences.getDefaultPreferences(context));
     }
 
     public static class RegisterCheckProcessor extends ProcessorDistributor.Processor<Intent> {

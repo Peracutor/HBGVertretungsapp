@@ -1,6 +1,5 @@
 package com.peracutor.hbgserverapi;
 
-import java.io.IOException;
 import java.nio.charset.Charset;
 
 /**
@@ -10,5 +9,5 @@ import java.nio.charset.Charset;
 public interface HtmlDownloadHandler {
     void asyncDownload(String urlString, Charset charset, ResultCallback<String> callback);
 
-    String syncDownload(String urlString, Charset charset) throws IOException;
+    String syncDownload(String urlString, Charset charset) throws Exception;
 }

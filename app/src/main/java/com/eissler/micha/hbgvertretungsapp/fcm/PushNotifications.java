@@ -2,7 +2,8 @@ package com.eissler.micha.hbgvertretungsapp.fcm;
 
 import android.content.Context;
 
-import com.eissler.micha.hbgvertretungsapp.Preferences;
+import com.eissler.micha.hbgvertretungsapp.App;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -30,13 +31,31 @@ public class PushNotifications {
     private PushNotifications(Context context) {
         this.context = context;
         defaultPrefs = Preferences.getDefaultPreferences(context);
-
-        subscribedTopics = new SubscribedTopics().loadSavedTopics();
-        classNum = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, context).getInt(Preferences.Key.SELECTED_CLASS, 0);
+        subscribedTopics = new SubscribedTopics();
+        classNum = App.getSelectedClass(context);
     }
 
     public void activate() {
-        subscribeToWhitelist();
+        activate(Whitelist.isWhitelistModeActive(context));
+    }
+
+    public void activate(boolean whitelistModeActive) {
+        if (whitelistModeActive) {
+            //subscribe to all whitelist-subjects
+            Whitelist whitelist;
+            whitelist = Whitelist.get(context);
+
+            for (int i = 0; i < whitelist.size(); i++) {
+                String subject = whitelist.get(i);
+                subscribedTopics.add(classNum, subject);
+            }
+
+//            subscribedTopics.save();
+        } else {
+            subscribedTopics.add(String.format("%s-no_whitelist", classNum));
+        }
+        subscribeToClassNumber();
+//        subscribedTopics.save();
     }
 
     public void deactivate() {
@@ -45,23 +64,15 @@ public class PushNotifications {
 
     private void unsubscribeAll() {
         subscribedTopics.clear();
-        subscribedTopics.save();
+        subscribeToClassNumber();
+//        subscribedTopics.save();
     }
 
-    private void subscribeToWhitelist() {
 
-        Whitelist whitelist;
-        whitelist = Whitelist.get(context);
-
-        subscribedTopics = new SubscribedTopics(whitelist.size() + 1);
-
-        subscribedTopics.add(classNum);
-
-        for (int i = 0; i < whitelist.size(); i++) {
-            String topic = whitelist.get(i);
-            subscribedTopics.add(classNum, topic);
+    public void subscribeToClassNumber() {
+        if (!subscribedTopics.contains(String.valueOf(classNum))) {
+            subscribedTopics.add(classNum);
         }
-
         subscribedTopics.save();
     }
 
@@ -93,13 +104,10 @@ public class PushNotifications {
 
         public SubscribedTopics() {
             super();
+            loadSavedTopics();
         }
 
-        public SubscribedTopics(int size) {
-            super(size);
-        }
-
-        public SubscribedTopics loadSavedTopics() {
+        private SubscribedTopics loadSavedTopics() {
             addAll(defaultPrefs.getStringSet(Preferences.Key.SUBSCRIBED_TOPICS, null), false);
             return this;
         }
@@ -122,8 +130,8 @@ public class PushNotifications {
             return super.addAll(collection);
         }
 
-        public boolean add(int classNumber, String subjectName) {
-            return add(String.format("%s-%s", classNumber, subjectName));
+        public boolean add(int classNumber, String subject) {
+            return add(String.format("%s-%s", classNumber, App.encodeUmlauts(subject)));
         }
 
         public boolean add(int classNumber) {
@@ -132,7 +140,7 @@ public class PushNotifications {
 
 
         public boolean remove(int classNumber, String subject) {
-            return remove(String.format("%s-%s", classNumber, subject));
+            return remove(String.format("%s-%s", classNumber, App.encodeUmlauts(subject)));
         }
 
         @Override

@@ -22,6 +22,10 @@ public class HbgAsOfDateDownload extends HbgDownload<Date> {
         super(HBG_HEADER_URL);
     }
 
+    public HbgAsOfDateDownload(HtmlDownloadHandler downloadHandler) {
+        super(HBG_HEADER_URL, downloadHandler);
+    }
+
 
     @Override
     protected Date evaluate(String htmlText) {

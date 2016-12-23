@@ -11,6 +11,7 @@ import android.support.v7.app.AlertDialog;
 
 import com.eissler.micha.hbgvertretungsapp.fcm.AppEngine;
 import com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.peracutor.hbgbackend.registration.Registration;

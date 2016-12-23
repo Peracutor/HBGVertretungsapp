@@ -5,14 +5,19 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Locale;
+
+import static com.eissler.micha.hbgvertretungsapp.RequestCodes.ALARM_1;
+import static com.eissler.micha.hbgvertretungsapp.RequestCodes.ALARM_2;
 
 /**
  * Created by Micha on 12.06.2016.
  */
 public class Notifications {
-    public static final int ALARM_1 = 1;
-    public static final int ALARM_2 = 2;
 
 //    private static Notifications sInstance;
     private final Preferences prefs;
@@ -90,15 +95,14 @@ public class Notifications {
             calendar.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        System.out.printf("AlarmTime %s: %s\n", requestCode, App.PRECISE_SDF.format(calendar.getTime()));
+        System.out.printf("AlarmTime %s: %s\n", requestCode, new SimpleDateFormat("EE HH:mm:ss dd.MM.yy", Locale.GERMANY).format(calendar.getTime()));
         return calendar;
     }
 
     PendingIntent getAlarmPendingIntent(int requestCode) {
         Intent intent = new Intent(context, AlarmReceiver.class);
         intent.setAction("alarm.notification");
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        return PendingIntent.getBroadcast(context, requestCode, intent, 0);
     }
 
     private int getAlarmType() {
