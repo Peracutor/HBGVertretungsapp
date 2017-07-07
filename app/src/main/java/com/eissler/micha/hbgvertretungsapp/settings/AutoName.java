@@ -11,7 +11,7 @@ import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 public class AutoName extends com.peracutor.hbgserverapi.AutoName {
 
     public AutoName(Context context) {
-        super(Preferences.getDefaultPreferences(context).getString(Preferences.Key.AUTO_NAME_PATTERN, ""));
+        super(Preferences.getDefaultPreferences(context).getString(Preferences.Key.AUTO_NAME_PATTERN, "*f"));
     }
 
     public static boolean isAutoNamingEnabled(Context context) {

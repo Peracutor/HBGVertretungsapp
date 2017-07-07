@@ -5,7 +5,6 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -14,25 +13,26 @@ import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceScreen;
-import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.eissler.micha.hbgvertretungsapp.AlarmReceiver;
 import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.BootReceiver;
 import com.eissler.micha.hbgvertretungsapp.HbgApplication;
-import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
 import com.eissler.micha.hbgvertretungsapp.Notifications;
-import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.eissler.micha.hbgvertretungsapp.R;
 import com.eissler.micha.hbgvertretungsapp.RequestCodes;
 import com.eissler.micha.hbgvertretungsapp.UpdateCheck;
-import com.eissler.micha.hbgvertretungsapp.fcm.PushNotifications;
+import com.eissler.micha.hbgvertretungsapp.fcm.Subscriptions;
+import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
+import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.firebase.iid.FirebaseInstanceId;
@@ -97,9 +97,9 @@ public class SettingsFragment extends PreferenceFragment {
         final int playServicesAvailable = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(getActivity());
         if (playServicesAvailable != ConnectionResult.SUCCESS) {
             pushSwitch.setEnabled(false);
-            pushSwitch.setSummary("Google Play Dienste nicht verfügbar");
+            pushSwitch.setSummary("Google Play Dienste nicht verfügbar (s. Fehlerbehebung unten)");
             pushTestPreference.setTitle("Google Play Dienste installieren");
-            pushTestPreference.setSummary("Google Play Dienste installieren/aktualisieren, um Push-Benachrichtigungen empfangen zu können.");
+            pushTestPreference.setSummary("Google Play Dienste installieren/aktualisieren, um Echtzeit-Benachrichtigungen empfangen zu können.");
             pushTestPreference.setOnPreferenceClickListener(preference -> {
                 GoogleApiAvailability.getInstance().getErrorDialog(getActivity(), playServicesAvailable, 20).show();
                 return true;
@@ -107,91 +107,79 @@ public class SettingsFragment extends PreferenceFragment {
         } else {
             pushSwitch.setOnPreferenceChangeListener((preference, newValue) -> {
                 boolean switchedOn = (boolean) newValue;
-                if (switchedOn) {
-
-                    AlertDialog.Builder dialog = App.dialog("Push-Benachrichtigungen", null, getActivity());
-
-                    final boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
-                    final Preferences preferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, getActivity());
-                    int classNumber = preferences.getInt(Preferences.Key.SELECTED_CLASS, 0);
-
-
-                    dialog.setMessage("Du bekommst nun immer die neuesten Vertretungsmeldungen der Woche vom App-Server gesendet. Immer Freitags um 19:00 Uhr wird auf die nächste Woche gewechselt.")
-                               .setOnDismissListener(dialogInterface -> {
-                                   if (!preferences.getBoolean(Preferences.Key.TEST_PUSH_PROMPTED, false)) {
-                                       preferences.edit().putBoolean(Preferences.Key.TEST_PUSH_PROMPTED, true).apply();
-                                       showTestPushDialog();
-                                   }
-                               }).show();
-
-                    if (!whitelistModeActive && (classNumber == 21 || classNumber == 22)) {
-                        App.dialog("Hinweis zum Batterieverbrauch (Oberstufe)", "Wenn der Whitelist-Modus nicht aktiv ist, ist der Akkuverbrauch für Push-Benachrichtigungen höher: Dein Gerät empfängt JEDE Vertretungsmeldung für dein Semester, " +
-                                "wird dadurch \"aufgeweckt\", auch wenn die Meldung dann garnicht angezeigt werden soll. Der Akkuverbrauch im Whitelist-Modus ist geringer, " +
-                                "da hier nur Meldungen zu den gespeicherten Fächern empfangen werden und das Gerät \"aufwecken\".", getActivity())
-                                .setPositiveButton("Verstanden", null)
-                                .show();
-                    }
-
-                    PushNotifications.newInstance(getActivity()).activate();
-
+                Subscriptions subscriptions = Subscriptions.newInstance(getActivity());
+                if (!switchedOn) {
+                    subscriptions.unsubscribe();
                     return true;
                 } else {
-                    PushNotifications.newInstance(getActivity()).deactivate();
+                    final Preferences preferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, getActivity());
+                    if (!preferences.getBoolean(Preferences.Key.TEST_PUSH_PROMPTED, false)) {
+                        preferences.edit().putBoolean(Preferences.Key.TEST_PUSH_PROMPTED, true).apply();
+                        showTestPushDialog();
+                    }
+                    subscriptions.subscribe();
                 }
                 return true;
             });
             pushTestPreference.setOnPreferenceClickListener(preference -> showTestPushDialog());
         }
 
-        final CheckBoxPreference whitelistSwitch = (CheckBoxPreference) findPreference(WHITELIST_SWITCH);
+        findPreference(Preferences.Key.WEEK_CHANGE_NOTIFICATION.getKey()).setOnPreferenceChangeListener((preference, o) -> {
+            boolean switchedOn = (boolean) o;
+            Subscriptions subscriptions = Subscriptions.newInstance(getActivity());
+            subscriptions.changeWeekChangeSubscription(switchedOn);
+            subscriptions.printSubs();
+            return true;
+        });
 
-        final PreferenceScreen hiddenSubjects = (PreferenceScreen) findPreference("hidden_subjects");
-        final PreferenceScreen whitelistSubjects = (PreferenceScreen) findPreference("whitelist_subjects");
+        final ListPreference filterModePreference = (ListPreference) findPreference(WHITELIST_SWITCH);
+
+        final Preference hiddenSubjects = findPreference("hidden_subjects");
+        final Preference whitelistSubjects = findPreference("whitelist_subjects");
 
         final boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
 
         hiddenSubjects.setEnabled(!whitelistModeActive);
-        whitelistSwitch.setOnPreferenceChangeListener((preference, newValue) -> {
-            boolean switchedOn = (boolean) newValue;
+        whitelistSubjects.setEnabled(whitelistModeActive);
+        final String[] filterEntries = getResources().getStringArray(R.array.filter_mode_entries);
+        filterModePreference.setSummary(whitelistModeActive ? filterEntries[1] : filterEntries[0]);
 
+        filterModePreference.setOnPreferenceClickListener(preference -> {
+            Preferences preferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, getActivity());
+            if (!preferences.getBoolean(Preferences.Key.DONT_PROMPT_FILTER_MODE, false)) {
+                new MaterialDialog.Builder(getActivity())
+                        .title("Optionen zum Filtern")
+                        .content("Damit dir nur für dich relevante Fächer angezeigt werden, gibt es zwei Möglichkeiten:\n\n" +
+                                "1. Einzeln die Fächer, die du nicht hast, verstecken (wenn du sie siehst).\n\n" +
+                                "2. Einmalig alle Fächer, die du hast, einspeichern.")
+                        .positiveText("Ok")
+                        .checkBoxPrompt("Nicht mehr anzeigen", true, null)
+                        .onPositive((dialog, which) -> {
+                            if (dialog.isPromptCheckBoxChecked()) {
+                                preferences.edit().putBoolean(Preferences.Key.DONT_PROMPT_FILTER_MODE, true).apply();
+                            }
+                        })
+                        .show();
+            }
+            return true;
+        });
 
+        filterModePreference.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean whitelistMode = newValue.equals("whitelist");
+            Log.d(HbgApplication.HBG_APP, "Whitelist-mode is now switched: " + (whitelistMode ? "On" : "Off"));
 
-//                Whitelist whitelist = Whitelist.get(getActivity());
-//                if (switchedOn && whitelist.size() < 8) {
-//                    String warning;
-//                    String format = "Es sind %s Fächer gespeichert, die angezeigt werden sollen!";
-//                    if (whitelist.size() == 0) {
-//                        warning = String.format(format, "keine");
-//                    } else if (whitelist.size() == 1) {
-//                        warning = "Es ist nur 1 Fach gespeichert, das angezeigt werden soll!";
-//                    } else {
-//                        warning = String.format(format, "nur " + whitelist.size());
-//                    }
-//
-//                    App.dialog("Achtung!", warning + "\n\nWillst du zur Whitelist-Einstellungsseite wechseln?", getActivity())
-//                        .setPositiveButton("Ja", new DialogInterface.OnClickListener() {
-//                            @Override
-//                            public void onClick(DialogInterface dialog, int which) {
-//                                startActivity(new Intent(getActivity(), WhitelistSubjects.class));
-//                            }
-//                        })
-//                        .setNegativeButton("Nein", null)
-//                            .show();
-//                } else
-            if (switchedOn) {
+            preference.setSummary(whitelistMode ? filterEntries[1] : filterEntries[0]);
+
+            hiddenSubjects.setEnabled(!whitelistMode);
+            whitelistSubjects.setEnabled(whitelistMode);
+
+            if (Subscriptions.isEnabled(getActivity())) {
+                Subscriptions.newInstance(getActivity(), whitelistMode).resetSubscriptions();
+            }
+
+            if (whitelistMode) {
                 startActivity(new Intent(getActivity(), WhitelistSubjects.class));
             }
-            Log.d(HbgApplication.HBG_APP, "Whitelist-mode toggled, is now switched: " + (switchedOn ? "On" : "Off"));
-
-            hiddenSubjects.setEnabled(!switchedOn);
-            whitelistSubjects.setEnabled(switchedOn);
-
-            if (PushNotifications.isEnabled(getActivity())) {
-                PushNotifications pushNotifications = PushNotifications.newInstance(getActivity());
-                pushNotifications.deactivate();
-                pushNotifications.activate(switchedOn);
-            }
-
             return true;
         });
 
@@ -211,42 +199,38 @@ public class SettingsFragment extends PreferenceFragment {
 
                 CharSequence[] entryValues = patternPref.getEntryValues();
                 if (pattern.equals(DEFAULT_CUSTOM_PATTERN) || pattern.equals(entryValues[entryValues.length - 1])) {
-                    final View dialogView = getActivity().getLayoutInflater().inflate(R.layout.edit_text_dialog, null);
+                    final View dialogView = getActivity().getLayoutInflater().inflate(R.layout.dialog_custom_pattern, null);
                     final TextView label = (TextView) dialogView.findViewById(R.id.edit_text_label);
-                    final EditText editText = (EditText) dialogView.findViewById(R.id.kursName);
+                    final EditText editText = (EditText) dialogView.findViewById(R.id.edit_text_custom_pattern);
 
-                    editText.setHint("z.B. " + DEFAULT_CUSTOM_PATTERN);
                     editText.setText(pattern);
                     editText.setSelection(pattern.length());
-                    String text = "Benutze \"*f\" als Platzhalter für den Namen des Fachs, \"*k\" für die Kursart (GK/LK)  und \"*n\" für die Kursnummer.\n\nAktuelles Muster (am Beispiel LEkN2):\nLEkN2 ->";
+                    String text = "Benutze \"*f\" als Platzhalter für den Namen des Fachs, \"*k\" für die Kursart (GK/LK)  und \"*n\" für die Kursnummer.\n\nAktuelles Muster:\nLEkN2 wird zu:";
                     label.setText(String.format("%s %s", text, new AutoName(pattern).getAutoName("LEkA2")));
 
-                    final AlertDialog dialog = new AlertDialog.Builder(getActivity()).setView(dialogView)
-                            .setTitle("Eigenes Muster")
-                            .setPositiveButton("Speichern", (dialog1, which) -> {
+                    final MaterialDialog dialog = new MaterialDialog.Builder(getActivity()).customView(dialogView, true)
+                            .title("Eigenes Muster")
+                            .positiveText("Speichern")
+                            .onPositive((a, b) -> {
                                 String pattern1 = editText.getText().toString();
                                 updatePatternPreference(pattern1, patternPref);
                             })
-                            .setNegativeButton("Abbrechen", null)
+                            .negativeText("Abbrechen")
                             .show();
 
+                    if (dialog.getWindow() != null) dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
-                    editText.addTextChangedListener(new InputValidator() {
+
+                    editText.addTextChangedListener(new InputValidator.DisablerEditTextValidator(editText, dialog.getActionButton(DialogAction.POSITIVE)) {
                         @Override
-                        protected boolean validate(String pattern) {
-                            boolean valid = pattern.contains("*f");
-                            if (valid) {
-                                label.setText(String.format("%s %s", text, new AutoName(pattern).getAutoName("LEkA2")));
+                        public CharSequence validate(CharSequence pattern) {
+                            if (pattern.toString().contains("*f")) {
+                                label.setText(String.format("%s %s", text, new AutoName(pattern.toString()).getAutoName("LEkA2")));
+                                return null;
                             } else {
                                 label.setText(text);
+                                return "Muss \"*f\" enthalten";
                             }
-                            return valid;
-                        }
-
-                        @Override
-                        protected void onValidated(boolean valid) {
-                            editText.setError(valid ? null : "Muss \"*f\" enthalten");
-                            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(valid);
                         }
                     });
                     return false;
@@ -317,9 +301,8 @@ public class SettingsFragment extends PreferenceFragment {
             App.dialog("Keine Internetverbindung", "Stelle eine Internetverbindung her.", getActivity()).show();
             return true;
         }
-        App.dialog("Push-Benachrichtigung testen", "Soll eine Testbenachrichtigung an dich gesendet werden?\n\nSchließe die App, um zu sehen, ob du Nachrichten im Hintergrund empfangen kannst.", getActivity()) // TODO: 20.10.2016 Wortwahl
-                .setPositiveButton("Ja, testen", (dialogInterface, i) -> {
-//                                new TestPushRequestProcessor(getActivity()).executeAsync(FirebaseInstanceId.getInstance().getToken());
+        App.dialog("Echtzeit-Benachrichtigung testen", "Zum Test kann der App-Server eine Nachricht an dich senden. Jetzt testen?\n\n(Schließe die App, um zu sehen, ob du Nachrichten auch im Hintergrund empfangen kannst)", getActivity())
+                .setPositiveButton("Testen", (dialogInterface, i) -> {
                     Toast.makeText(getActivity(), "In 20 Sekunden wird die Anfrage gesendet", Toast.LENGTH_LONG).show();
 
                     AlarmManager alarmManager = (AlarmManager) getActivity().getSystemService(Context.ALARM_SERVICE);
@@ -354,4 +337,14 @@ public class SettingsFragment extends PreferenceFragment {
                 .show();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        final String[] filterEntries = getResources().getStringArray(R.array.filter_mode_entries);
+        ListPreference filterModePreference = (ListPreference) findPreference(WHITELIST_SWITCH);
+        boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
+        filterModePreference.setSummary(whitelistModeActive ? filterEntries[1] : filterEntries[0]);
+        findPreference("hidden_subjects").setEnabled(!whitelistModeActive);
+        findPreference("whitelist_subjects").setEnabled(whitelistModeActive);
+    }
 }

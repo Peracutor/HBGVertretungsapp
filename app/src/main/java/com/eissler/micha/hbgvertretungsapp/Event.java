@@ -30,8 +30,6 @@ public class Event {
         }
     }
 
-
-
     public static class CanScrollUp {
 
         private boolean canScrollUp;
@@ -72,6 +70,31 @@ public class Event {
 
         public java.lang.Exception getException() {
             return e;
+        }
+    }
+
+    public static class RefreshStatus {
+
+        private boolean status;
+
+        public RefreshStatus(boolean status) {
+            this.status = status;
+        }
+
+        public boolean getStatus() {
+            return status;
+        }
+    }
+
+    public static class WaitForMainActivity {
+        private App.WaitFor<MainActivity> waitFor;
+
+        public WaitForMainActivity(App.WaitFor<MainActivity> waitFor) {
+            this.waitFor = waitFor;
+        }
+
+        public App.WaitFor<MainActivity> getWaitFor() {
+            return waitFor;
         }
     }
 }

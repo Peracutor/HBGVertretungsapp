@@ -35,9 +35,14 @@ public class DateHeaderItem extends AbstractItem<DateHeaderItem, DateHeaderItem.
     }
 
     @Override
-    public void bindView(ViewHolder holder, List payloads) {
+    public void bindView(ViewHolder holder, List<Object> payloads) {
         super.bindView(holder, payloads);
         holder.dateView.setText(headerMessage.getHeaderString());
+    }
+
+    @Override
+    public boolean isSelectable() {
+        return false;
     }
 
     @Override

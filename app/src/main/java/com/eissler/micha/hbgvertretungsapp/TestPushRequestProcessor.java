@@ -9,11 +9,11 @@ import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 
 import com.eissler.micha.hbgvertretungsapp.fcm.AppEngine;
+import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.peracutor.hbgbackend.messaging.Messaging;
-import com.peracutor.hbgserverapi.DownloadException;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -46,7 +46,7 @@ public class TestPushRequestProcessor extends ProcessorDistributor.Processor<Int
                     NotificationCompat.Builder builder = App.getIntentNotificationBuilder(getContext())
                             .setContentTitle("Fehler")
                             .setContentText("Testanfrage konnte nicht gesendet werden")
-                            .setStyle(new NotificationCompat.BigTextStyle().bigText("Testanfrage konnte nicht an den Server gesendet werden:\n" + e.getMessage() + "\n(" + e.getCause().getMessage() + ")"));
+                            .setStyle(new NotificationCompat.BigTextStyle().bigText("Testanfrage konnte nicht an den Server gesendet werden:\n" + e.getMessage() + (e.getCause() != null ? "\n(" + e.getCause().getMessage() + ")" : "")));
 
                     NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -77,7 +77,7 @@ public class TestPushRequestProcessor extends ProcessorDistributor.Processor<Int
 
         @Override
         public void process(Intent object) {
-            String text = "Es wurde keine Push-Benachrichtigung empfangen";
+            String text = "Es wurde keine Testbenachrichtigung empfangen";
             NotificationCompat.Builder builder = App.getIntentNotificationBuilder(getContext())
                     .setContentTitle("Test fehlgeschlagen")
                     .setContentText(text)

@@ -4,11 +4,12 @@
 
     <item android:id="@+id/item_share"
         android:title="@string/share"
-        app:showAsAction="ifRoom"
+        app:showAsAction="ifRoom|withText"
         android:icon="@drawable/ic_share_white_48dp"/>
 
     <item
         android:id="@+id/item_delete"
         android:title="@string/do_not_show"
-        app:showAsAction="ifRoom|withText" />
+        app:showAsAction="ifRoom|withText"
+        android:icon="@drawable/ic_visibility_off_white_48dp"/>
 </menu>

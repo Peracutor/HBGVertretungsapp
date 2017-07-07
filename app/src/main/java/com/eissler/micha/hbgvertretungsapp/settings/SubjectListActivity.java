@@ -15,13 +15,17 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.eissler.micha.hbgvertretungsapp.App;
 import com.eissler.micha.hbgvertretungsapp.R;
-import com.eissler.micha.hbgvertretungsapp.util.FastAdapterHelper;
+import com.eissler.micha.hbgvertretungsapp.util.CheckBoxItem;
 import com.eissler.micha.hbgvertretungsapp.util.InputValidator;
+import com.eissler.micha.hbgvertretungsapp.util.MultiSelectHelper;
 import com.mikepenz.fastadapter.FastAdapter;
 import com.mikepenz.fastadapter.IItem;
-import com.mikepenz.fastadapter.adapters.FastItemAdapter;
+import com.mikepenz.fastadapter.adapters.HeaderAdapter;
+import com.mikepenz.fastadapter.commons.adapters.FastItemAdapter;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -33,21 +37,22 @@ import java.util.Set;
 public abstract class SubjectListActivity<T extends IItem> extends AppCompatActivity implements ActionMode.Callback {
 
     protected FastItemAdapter<T> fastAdapter;
-    private T noItemsItem;
+    private HeaderAdapter<SimpleTextItem> noItemsAdapter;
+    private List<SimpleTextItem> noItemsList;
 
 
     protected abstract void initialize();
 
-    protected abstract List<T> getItems(); // TODO: 23.12.2016 when returning multiple items, list is completely screwed
+    protected abstract List<T> getItems();
 
     protected abstract void addToData(String subject);
 
     protected abstract void removeFromData(Set<T> indices);
 
-    protected abstract T getNoItemsItem();
+    protected abstract SimpleTextItem getNoItemsItem();
 
-
-    @StringRes protected abstract int getLabelResource();
+    @StringRes
+    protected abstract int getLabelResource();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,16 +67,25 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
 
         fastAdapter = new FastItemAdapter<>();
         fastAdapter.setHasStableIds(true);
+        fastAdapter.withSelectWithItemUpdate(true);
+
+
+        fastAdapter = new MultiSelectHelper<>(fastAdapter).setupMultiSelectAdapter(this, R.menu.menu_cab_subject_list, this, null, getOnClickListener(), viewHolder -> {
+            if (viewHolder instanceof CheckBoxItem.ViewHolder) {
+                return ((CheckBoxItem.ViewHolder) viewHolder).checkBox;
+            }
+            return null;
+        });
+
+        noItemsAdapter = new HeaderAdapter<>();
+
+        recyclerView.setAdapter(noItemsAdapter.wrap(fastAdapter));
+
+        SimpleTextItem noItemsItem = getNoItemsItem();
+        noItemsItem.withSelectable(false);
+        noItemsList = Collections.singletonList(noItemsItem);
 
         initialize();
-
-        fastAdapter = FastAdapterHelper.setupMultiSelectAdapter(fastAdapter, this, this, null, getOnClickListener());
-
-        recyclerView.setAdapter(this.fastAdapter);
-
-        noItemsItem = getNoItemsItem();
-        noItemsItem.withSelectable(false);
-
         updateList();
 
 
@@ -79,26 +93,24 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
 
     }
 
-
-
-
-
     protected void addTextWatcher(final EditText editText, final AlertDialog dialog) {
-        editText.addTextChangedListener(new InputValidator() {
-            @Override
-            protected boolean validate(String text) {
-                if (text.equals("")) {
-                    editText.setError("Feld darf nicht leer sein");
-                    return false;
-                } else {
-                    editText.setError(null);
-                    return true;
-                }
-            }
+
+        editText.addTextChangedListener(new InputValidator.DisablerEditTextValidator(editText, dialog.getButton(DialogInterface.BUTTON_POSITIVE)) {
+            int selectedClass = App.getSelectedClass(SubjectListActivity.this);
+            boolean oberstufe = selectedClass == 21 || selectedClass == 22;
 
             @Override
-            protected void onValidated(boolean valid) {
-                dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(valid);
+            public CharSequence validate(CharSequence input) {
+                String text = input.toString().trim();
+                if (text.equals("")) {
+                    return "Feld darf nicht leer sein";
+                } else if (text.contains(" ")) {
+                    return "Darf keine Leerzeichen enthalten";
+                } else if (oberstufe && !(text.matches("[GL][A-Za-zÄÖÜäöüß]{2}[NAÜ]\\d?") || text.matches("S[A-Za-zÄÖÜäöüß]{3}\\d?")) || !oberstufe && !text.matches("[A-Za-zÄÖÜäöüß]{1,4}")) {
+                    return "Kürzel wie am Vertretungsplan angeben (z.B.\"" + (oberstufe ? "GDeN1" : "Bi") + "\")"; // TODO: 02.06.2017 make sure this is not blocking correct things
+                } else {
+                    return null;
+                }
             }
         });
 
@@ -108,7 +120,15 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
     protected void updateList() {
         List<T> items = getItems();
         if (items.isEmpty()) {
-            items = Collections.singletonList(noItemsItem);
+//            items = noItemsList;
+            noItemsAdapter.set(noItemsList);
+            fastAdapter.set(items);
+            return;
+        }
+        noItemsAdapter.set(new ArrayList<>(0));
+        for (int i = 0; i < items.size(); i++) {
+            T item = items.get(i);
+            item.withIdentifier(i);
         }
         fastAdapter.set(items);
     }
@@ -116,6 +136,7 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
 
     @Override
     public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+        fastAdapter.notifyAdapterDataSetChanged();
         return true;
     }
 
@@ -139,12 +160,17 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
 
     @Override
     public void onDestroyActionMode(ActionMode mode) {
+        fastAdapter.notifyAdapterDataSetChanged();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_subject_list, menu);
+        getMenuInflater().inflate(getMenuRes(), menu);
         return true;
+    }
+
+    protected int getMenuRes() {
+        return R.menu.menu_subject_list;
     }
 
     @Override
@@ -159,14 +185,14 @@ public abstract class SubjectListActivity<T extends IItem> extends AppCompatActi
     }
 
     protected void actionAdd() {
-        final View dialogView = getLayoutInflater().inflate(R.layout.edit_text_dialog, null);
+        final View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_subject, null);
         final EditText editText = (EditText) dialogView.findViewById(R.id.kursName);
 
 
         final AlertDialog dialog = new AlertDialog.Builder(SubjectListActivity.this).setView(dialogView)
                 .setTitle("Fach hinzufügen")
                 .setPositiveButton("Hinzufügen", (dialog1, which) -> {
-                    String subject = editText.getText().toString();
+                    String subject = editText.getText().toString().trim();
 
                     if (subject.equals("")) {
                         return;

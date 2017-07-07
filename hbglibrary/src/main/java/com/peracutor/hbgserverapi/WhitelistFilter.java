@@ -17,10 +17,19 @@ public class WhitelistFilter implements Filter {
 
     @Override
     public boolean shouldShowMessage(CoverMessage coverMessage) {
-        boolean showSubject = whiteList.contains(coverMessage.get(CoverMessage.SUBJECT));
-        boolean showNewSubject = whiteList.contains(coverMessage.get(CoverMessage.NEW_SUBJECT));
+        String subject = coverMessage.get(CoverMessage.SUBJECT);
+        String newSubject = coverMessage.get(CoverMessage.NEW_SUBJECT);
+        return subject.equals("") && newSubject.equals("")
+                || containsIgnoreCase(whiteList, subject)
+                || containsIgnoreCase(whiteList, newSubject)
+                || isSubjectInCoverText(coverMessage.get(CoverMessage.COVER_TEXT));
+    }
 
-        return showSubject || showNewSubject || isSubjectInCoverText(coverMessage.get(CoverMessage.COVER_TEXT));
+    public boolean containsIgnoreCase(List<String> list, String contains) {
+        for (String s : list) {
+            if (contains.equalsIgnoreCase(s)) return true;
+        }
+        return false;
     }
 
     private boolean isSubjectInCoverText(String coverText) {

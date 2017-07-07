@@ -1,10 +1,11 @@
 package com.peracutor.hbgbackend;
 
+import com.eissler.micha.cloudmessaginglibrary.AsciiEncoder;
+import com.eissler.micha.cloudmessaginglibrary.Recipients;
 import com.peracutor.hbgserverapi.CoverMessage;
 
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Date;
+import java.util.Locale;
 
 /**
  * Created by Micha.
@@ -16,39 +17,27 @@ public class CoverMessageWrapper extends CoverMessage {
         super(coverMessage);
     }
 
-//    public String getCollapseKey() {
-//        String date = get(DATE);
-//        String subject = get(SUBJECT).equals("") ? "n-" + get(NEW_SUBJECT) : get(SUBJECT);
-//        String hour = get(HOUR);
-//        return !hour.equals("") && !subject.equals("") ?
-//                String.format("%s/%s/%s", date.substring(0, date.length()-1).replace('.', '-'), hour, subject)
-//                : null;
-//    }
-
-    public Map<String, String> toMap() {
-        Map<String, String> map = new HashMap<>(9);
-        map.put("Jahr", String.valueOf(year));
-
-        for (int i = 0; i < 8; i++) {
-            map.put(String.valueOf(i), get(i));
-        }
-        return map;
-    }
-
-    public String getTopic(int classNum) {
+    public String getTopic(int classNumber) {
         String topic;
         if (get(SUBJECT).equals("") && get(NEW_SUBJECT).equals("")) {
-            topic = String.valueOf(classNum);
+            topic = String.format(Locale.GERMANY, "%s-whitelist", classNumber);
         } else {
-
             topic = String.format("%s-%s",
-                    classNum,
+                    classNumber,
                     !get(SUBJECT).equals("") ? get(SUBJECT) : get(NEW_SUBJECT));
         }
-        return topic;
+
+        return AsciiEncoder.encode(topic);
+    }
+
+    public Recipients getCondition(int classNumber) {
+        return new Recipients().condition(new Recipients.Condition()
+                .topic(getTopic(classNumber))
+                .or().topic(classNumber + "-no_whitelist")
+                .or().topic(getTopic(classNumber).toLowerCase()));
     }
 
     public int getTimeToLive() {
-        return (int) (((getConcernedDate().getTimeInMillis() - Calendar.getInstance().getTimeInMillis()) / 1000) - (5 * 60));
+        return (int) (((getConcernedDate().getTime() - new Date().getTime()) / 1000) - (5 * 60));
     }
 }

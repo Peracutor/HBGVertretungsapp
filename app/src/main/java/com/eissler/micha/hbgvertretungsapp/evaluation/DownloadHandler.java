@@ -4,9 +4,9 @@ import android.content.Context;
 import android.widget.ProgressBar;
 
 import com.eissler.micha.hbgvertretungsapp.App;
+import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.koushikdutta.ion.Ion;
 import com.koushikdutta.ion.future.ResponseFuture;
-import com.peracutor.hbgserverapi.DownloadException;
 import com.peracutor.hbgserverapi.HtmlDownloadHandler;
 import com.peracutor.hbgserverapi.ResultCallback;
 
@@ -41,7 +41,7 @@ public class DownloadHandler implements HtmlDownloadHandler {
                 .setCallback((e, result) -> {
                     if (progressBar != null) progressBar.setProgress(100);
                     if (e != null) {
-                        callback.onError(e);
+                        callback.onError(new DownloadException(e));
                     } else {
                         callback.onResult(result);
                     }
@@ -49,11 +49,15 @@ public class DownloadHandler implements HtmlDownloadHandler {
     }
 
     @Override
-    public String syncDownload(String urlString, Charset charset) throws Exception {
+    public String syncDownload(String urlString, Charset charset) throws DownloadException {
         if (!App.isConnected(context)) {
             throw new DownloadException(DownloadException.ErrorType.NO_CONNECTION);
         }
-        return getIonBuilder(urlString, charset).get();
+        try {
+            return getIonBuilder(urlString, charset).get();
+        } catch (Exception e) {
+            throw new DownloadException(e);
+        }
     }
 
     private ResponseFuture<String> getIonBuilder(String urlString, Charset charset) {

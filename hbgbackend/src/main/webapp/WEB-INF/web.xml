@@ -13,7 +13,10 @@
         <servlet-class>com.google.api.server.spi.SystemServiceServlet</servlet-class>
         <init-param>
             <param-name>services</param-name>
-            <param-value>com.peracutor.hbgbackend.RegistrationEndpoint, com.peracutor.hbgbackend.MessagingEndpoint</param-value>
+            <param-value>com.peracutor.hbgbackend.RegistrationEndpoint,
+                com.peracutor.hbgbackend.MessagingEndpoint,
+                com.peracutor.hbgbackend.HbgOnlineInterface,
+                </param-value>
         </init-param>
     </servlet>
     <servlet-mapping>
@@ -32,6 +35,15 @@
     <servlet-mapping>
         <servlet-name>HbgPoll</servlet-name>
         <url-pattern>/cron/hbg-poll</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>NotificationConfirmation</servlet-name>
+        <servlet-class>com.peracutor.hbgbackend.ConfirmNotificationServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>NotificationConfirmation</servlet-name>
+        <url-pattern>/confirm_notification</url-pattern>
     </servlet-mapping>
 
     <security-constraint>

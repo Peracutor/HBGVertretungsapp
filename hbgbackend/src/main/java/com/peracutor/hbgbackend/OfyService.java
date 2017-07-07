@@ -14,6 +14,7 @@ public class OfyService {
         ObjectifyService.register(RegistrationRecord.class);
         ObjectifyService.register(SavedMessages.class);
         ObjectifyService.register(SavedAsOfDate.class);
+        ObjectifyService.register(SavedSubmittedNotification.class);
     }
 
     public static Objectify ofy() {

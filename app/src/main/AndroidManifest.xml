@@ -6,7 +6,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_LOGS" />
-    <!--<uses-permission android:name="android.permission.GET_ACCOUNTS" />-->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- <uses-permission android:name="android.permission.GET_ACCOUNTS" /> -->
     <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
 
     <application
@@ -15,7 +16,6 @@
         android:icon="@mipmap/app_icon"
         android:label="@string/app_name"
         android:theme="@style/HbgTheme">
-
         <activity
             android:name=".MainActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
@@ -23,22 +23,55 @@
             android:launchMode="singleInstance">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" /> <!--todo configchanges and launchMode-->
+
+                <category android:name="android.intent.category.LAUNCHER" /> <!-- todo configchanges and launchMode -->
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" android:host="vp.hbgym.de" />
+
+                <data
+                    android:host="vp.hbgym.de"
+                    android:scheme="http" />
             </intent-filter>
-
         </activity>
-
         <activity
             android:name=".settings.SettingsActivity"
             android:label="@string/action_settings"
-            android:theme="@style/HbgTheme"
-            android:parentActivityName=".MainActivity">
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/HbgTheme">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.eissler.micha.hbgvertretungsapp.MainActivity" />
+        </activity>
+        <activity
+            android:name=".settings.NotificationSettingsActivity"
+            android:label="@string/title_activity_notification_settings"
+            android:parentActivityName=".settings.SettingsActivity"
+            android:theme="@style/HbgTheme">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity" />
+
+            <intent-filter>
+                <action android:name="com.eissler.micha.hbgvertretungsapp.settings.NotificationSettingsActivity" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".settings.SubmitNotificationActivity"
+            android:label="@string/title_activity_submit_notification"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/HbgTheme">
+            <intent-filter>
+                <action android:name="com.eissler.micha.hbgvertretungsapp.settings.SubmitNotification" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.eissler.micha.hbgvertretungsapp.MainActivity" />
@@ -55,8 +88,8 @@
         <activity
             android:name=".settings.CustomNamesList"
             android:label="@string/title_activity_custom_names_list"
-            android:theme="@style/HbgTheme"
-            android:parentActivityName=".settings.SettingsActivity">
+            android:parentActivityName=".settings.SettingsActivity"
+            android:theme="@style/HbgTheme">
             <intent-filter>
                 <action android:name="com.eissler.micha.hbgvertretungsapp.CustomNames" />
 
@@ -70,8 +103,8 @@
         <activity
             android:name=".settings.HiddenSubjects"
             android:label="@string/title_activity_hidden_subjects"
-            android:theme="@style/HbgTheme"
-            android:parentActivityName=".settings.SettingsActivity">
+            android:parentActivityName=".settings.SettingsActivity"
+            android:theme="@style/HbgTheme">
             <intent-filter>
                 <action android:name="com.eissler.micha.hbgvertretungsapp.HiddenSubjects" />
 
@@ -85,8 +118,8 @@
         <activity
             android:name=".settings.WhitelistSubjects"
             android:label="@string/title_activity_whitelist_subjects"
-            android:theme="@style/HbgTheme"
-            android:parentActivityName=".settings.SettingsActivity">
+            android:parentActivityName=".settings.SettingsActivity"
+            android:theme="@style/HbgTheme">
             <intent-filter>
                 <action android:name="com.eissler.micha.hbgvertretungsapp.WhitelistSubjects" />
 
@@ -98,13 +131,17 @@
                 android:value=".settings.SettingsActivity" />
             >
         </activity>
-
-        <activity android:name=".fcm.NotificationViewActivity"
+        <activity
+            android:name=".fcm.NotificationViewActivity"
             android:label="@string/title_activity_notificationview"
+            android:parentActivityName=".MainActivity"
             android:theme="@style/HbgTheme"
-            android:parentActivityName=".MainActivity">
+            android:launchMode="standard"
+            >
+
             <intent-filter>
                 <action android:name="NotificationViewActivity" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
@@ -112,23 +149,18 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.eissler.micha.hbgvertretungsapp.MainActivity" />
         </activity>
+        <activity
+            android:name=".AppIntro"
+            android:label="@string/title_activity_app_intro"
+            android:theme="@style/HbgTheme">
 
-        <!--<activity
-            android:name=".WhitelistWizardActivity"
-            android:label="@string/title_whitelist_wizard_activity"
-            android:theme="@style/HbgTheme"
+            <!--
             android:parentActivityName=".MainActivity">
-            <intent-filter>
-                <action android:name="com.eissler.micha.hbgvertretungsapp.WhitelistWizardActivity" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
-                android:value=".MainActivity" />
-            >
-        </activity>-->
+                android:value="com.eissler.micha.hbgvertretungsapp.MainActivity" />
+            -->
+        </activity>
 
         <receiver
             android:name=".BootReceiver"
@@ -137,7 +169,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
         <receiver
             android:name=".AlarmReceiver"
             android:enabled="true"
@@ -151,7 +182,6 @@
         <service
             android:name=".NotificationService"
             android:exported="false" />
-
         <service
             android:name="org.acra.sender.SenderService"
             android:exported="false"
@@ -166,7 +196,6 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-
         <service
             android:name=".fcm.InstanceIdListenerService"
             android:exported="false">

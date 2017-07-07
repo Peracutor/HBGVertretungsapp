@@ -2,8 +2,8 @@ package com.eissler.micha.hbgvertretungsapp.settings;
 
 import android.content.Context;
 
+import com.eissler.micha.hbgvertretungsapp.fcm.Subscriptions;
 import com.eissler.micha.hbgvertretungsapp.util.Preferences;
-import com.eissler.micha.hbgvertretungsapp.fcm.PushNotifications;
 
 /**
  * Created by Micha.
@@ -15,7 +15,7 @@ public class Whitelist extends SavedList {
 
     private boolean pushEnabled;
 
-    private PushNotifications pushNotifications;
+    private Subscriptions subscriptions;
 
     public static Whitelist get(Context context) {
         return new Whitelist(context);
@@ -31,58 +31,57 @@ public class Whitelist extends SavedList {
 
     private Whitelist(Context context, int capacity) {
         super(WHITELIST_ITEMS, capacity, context);
-        pushEnabled = PushNotifications.isEnabled(context);
-    }
-
-    private boolean pushEnabled() {
-        if (pushNotifications == null) {
-            pushNotifications = PushNotifications.newInstance(context);
-        }
-        return pushEnabled;
+        pushEnabled = Subscriptions.isEnabled(context);
+        if (pushEnabled) subscriptions = Subscriptions.newInstance(context);
     }
 
     @Override
     public boolean save() {
-        if (pushEnabled()) {
-            pushNotifications.saveEdits();
+        if (pushEnabled) {
+            subscriptions.saveEdits();
         }
         return super.save();
     }
 
     @Override
     public boolean add(String subject) {
-        if (pushEnabled()) {
-            pushNotifications.add(subject);
+        if (pushEnabled) {
+            subscriptions.add(subject);
         }
         return super.add(subject);
     }
 
     @Override
-    public String set(int index, String subject) {
-        String previousSubject = super.set(index, subject);
-        if (pushEnabled()) {
-            pushNotifications.remove(previousSubject);
-            if (subject != null) {
-                pushNotifications.add(subject);
-            }
-        }
+    public boolean remove(Object o) {
+        if (pushEnabled) {
 
-        return previousSubject;
+            subscriptions.remove((String) o);
+        }
+        return super.remove(o);
     }
 
-    //    public boolean isWhitelistModeActive() {
-//        return isWhitelistModeActive(context);
-//    }
+    @Override
+    public String remove(int index) {
+        System.out.println("Whitelist.remove");
+        if (pushEnabled) {
+            String subject = get(index);
+            System.out.println("subject = " + subject);
+            subscriptions.remove(subject);
+        }
+        return super.remove(index);
+    }
 
     public static boolean isWhitelistModeActive(Context context) {
-        return Preferences.getDefaultPreferences(context).getBoolean(Preferences.Key.WHITELIST_SWITCH, false);
+        return Preferences.getDefaultPreferences(context).getString(Preferences.Key.WHITELIST_SWITCH, "blacklist").equals("whitelist");
     }
 
-    public static void enable(boolean enable, Context context) {
-        Preferences.getDefaultPreferences(context).edit().putBoolean(Preferences.Key.WHITELIST_SWITCH, enable).apply();
-        if (!enable) {
-            PushNotifications.newInstance(context).deactivate();
-        }
+    public static void enableWhitelistMode(boolean enable, Context context) {
+        Preferences defPrefs = Preferences.getDefaultPreferences(context);
+        defPrefs.edit().putString(Preferences.Key.WHITELIST_SWITCH, enable ? "whitelist" : "blacklist").apply();
+        if (Subscriptions.isEnabled(context)) Subscriptions.newInstance(context).resetSubscriptions();
+    }
 
+    public Subscriptions getSubscriptions() {
+        return subscriptions;
     }
 }

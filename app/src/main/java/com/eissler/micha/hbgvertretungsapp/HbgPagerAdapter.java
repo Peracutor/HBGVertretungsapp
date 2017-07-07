@@ -6,7 +6,7 @@ import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v7.app.AppCompatActivity;
 
 import com.eissler.micha.hbgvertretungsapp.evaluation.DownloadHandler;
-import com.peracutor.hbgserverapi.DownloadException;
+import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.peracutor.hbgserverapi.HbgAvailableWeeksDownload;
 import com.peracutor.hbgserverapi.ResultCallback;
 
@@ -20,6 +20,7 @@ import java.util.Locale;
 
 public class HbgPagerAdapter extends FragmentStatePagerAdapter {
 
+    private static final String THIS_WEEK = "Diese Woche";
     private static final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
     private static final String FORMAT = "%s - %s";
 
@@ -35,7 +36,6 @@ public class HbgPagerAdapter extends FragmentStatePagerAdapter {
         if (availableWeeks == null || new Date(new Date().getTime() - MainActivity.REFRESH_COUNTDOWN_MILLIS).after(lastAvailablePagesLoad)) {
             availableWeeks = null;
 
-            System.out.println("MainActivity.loadAvailablePages");
             new HbgAvailableWeeksDownload(new DownloadHandler(activity)).executeAsync(new ResultCallback<ArrayList<Integer>>() {
                 @Override
                 public void onResult(ArrayList<Integer> availableWeeks) {
@@ -65,10 +65,20 @@ public class HbgPagerAdapter extends FragmentStatePagerAdapter {
 
                 @Override
                 public void onError(Throwable t) {
-                    EventBus.getDefault().post(new Event.Exception(new DownloadException(t)));
+                    Exception e;
+                    if (!t.getMessage().equals("Fehler beim Parsen")) {
+                        e = new DownloadException(t);
+                    } else {
+                        e = new Exception(t);
+                    }
+                    EventBus.getDefault().post(new Event.Exception(e));
                 }
             });
         }
+    }
+
+    public static void setAvailableWeeks(ArrayList<Integer> availableWeeks) {
+        HbgPagerAdapter.availableWeeks = availableWeeks;
     }
 
     @Override
@@ -78,7 +88,7 @@ public class HbgPagerAdapter extends FragmentStatePagerAdapter {
 
     @Override
     public Fragment getItem(int position) {
-        if (availableWeeks == null) {
+        if (availableWeeks == null || availableWeeks.size() == 0) {
             return new Fragment();
         }
         Fragment fragment = new FragmentPage();
@@ -103,7 +113,8 @@ public class HbgPagerAdapter extends FragmentStatePagerAdapter {
         if (availableWeeks == null) {
             return "Lade Wochenauswahl...";
         } else if (availableWeeks.size() == 0) {
-            return "Keine Woche auswählbar";
+            EventBus.getDefault().post(new Event.RefreshStatus(false));
+            return "Keine Woche verfügbar";
         }
 
         String title = titles[position];
@@ -111,7 +122,7 @@ public class HbgPagerAdapter extends FragmentStatePagerAdapter {
         if (title == null) {
             //noinspection WrongConstant
             if (Calendar.getInstance().get(Calendar.WEEK_OF_YEAR) == availableWeeks.get(position)) {
-                title = FragmentPage.THIS_WEEK;
+                title = THIS_WEEK;
             } else {
                 Calendar calendar = Calendar.getInstance();
                 calendar.set(Calendar.WEEK_OF_YEAR, availableWeeks.get(position));

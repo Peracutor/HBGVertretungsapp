@@ -1,20 +1,31 @@
 package com.peracutor.hbgserverapi;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
 
 /**
  * Created by Micha.
  * 30.04.2016
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CoverMessage implements HBGMessage {
 
     private static final int SIZE = 8;
 
     public final static int DATE = 0;
-    public final static int HOUR = 1;
+    public final static int LESSON = 1;
     public final static int SUBJECT = 2;
     public final static int NEW_SUBJECT = 3;
     public final static int ROOM = 4;
@@ -24,30 +35,31 @@ public class CoverMessage implements HBGMessage {
 
     private static final SimpleDateFormat SHORT_SDF = new SimpleDateFormat("dd.MM.", Locale.GERMANY);
 
-    private String[] msgFields;
+    private String[] fields;
     protected int year;
-    private long concernedDateMillis;
+    private Date concernedDate;
 
     @SuppressWarnings("unused")
     private CoverMessage() {
-        msgFields = new String[SIZE];/*For Objectify*/
+        fields = new String[SIZE];/*For Objectify*/
     }
 
     public CoverMessage(CoverMessage coverMessage) {
-        msgFields = coverMessage.msgFields;
-        concernedDateMillis = coverMessage.concernedDateMillis;
+        fields = coverMessage.fields;
+        concernedDate = coverMessage.concernedDate;
         year = coverMessage.year;
     }
 
     public CoverMessage(Builder coverMessageBuilder) {
         year = coverMessageBuilder.year;
-        msgFields = coverMessageBuilder.msgFields;
+        fields = coverMessageBuilder.msgFields;
         init();
     }
 
     private void init() {
         Calendar concernedCal = Calendar.getInstance();
         concernedCal.set(Calendar.SECOND, 0);
+        concernedCal.set(Calendar.MILLISECOND, 0);
         concernedCal.set(Calendar.YEAR, year);
 
         Calendar concernedDay = Calendar.getInstance();
@@ -61,20 +73,18 @@ public class CoverMessage implements HBGMessage {
         concernedCal.set(Calendar.MONTH, concernedDay.get(Calendar.MONTH));
         concernedCal.set(Calendar.DAY_OF_MONTH, concernedDay.get(Calendar.DAY_OF_MONTH));
 
-        String hour = get(HOUR);
-        if (hour.equals("?")) {
+        if (get(LESSON).equals("?")) {
             concernedCal.set(Calendar.HOUR_OF_DAY, 23);
             concernedCal.set(Calendar.MINUTE, 59);
-            concernedDateMillis = concernedCal.getTimeInMillis();
+            concernedDate = concernedCal.getTime();
             return;
         }
-        int classHour = getBeginningHour(hour);
         Calendar endOfClassCal = Calendar.getInstance();
-        endOfClassCal.setTime(EndOfClass.get(classHour));
+        endOfClassCal.setTime(EndOfClass.get(getBeginningHour()));
 
         concernedCal.set(Calendar.HOUR_OF_DAY, endOfClassCal.get(Calendar.HOUR_OF_DAY));
         concernedCal.set(Calendar.MINUTE, endOfClassCal.get(Calendar.MINUTE));
-        concernedDateMillis = concernedCal.getTimeInMillis();
+        concernedDate = concernedCal.getTime();
     }
 
     public static class Builder {
@@ -96,116 +106,174 @@ public class CoverMessage implements HBGMessage {
     }
 
     public String get(int index) {
-        return msgFields[index];
+        return fields[index];
     }
 
     public void set(int index, String field) {
-        msgFields[index] = field;
+        fields[index] = field;
     }
 
-    public Calendar getConcernedDate() {
-        Calendar concernedCal = Calendar.getInstance();
-        concernedCal.setTimeInMillis(concernedDateMillis);
-        return concernedCal;
+    public Date getConcernedDate() {
+        return concernedDate;
     }
 
-    private static int getBeginningHour(String hour) {
-        hour = hour.replace(".", "");
+    @JsonIgnore
+    public int getConcernedDay() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(getConcernedDate());
+        return calendar.get(Calendar.DAY_OF_WEEK);
+    }
 
-        int index = hour.indexOf("-");
+    @JsonIgnore
+    public int getBeginningHour() {
+        String lesson = get(LESSON).replace(".", "");
+
+        int index = lesson.indexOf("-");
         if (index == -1) {
-            return Integer.parseInt(hour.trim());
+            return Integer.parseInt(lesson.trim());
         }
-        return Integer.parseInt(hour.substring(0, index).trim());
+        return Integer.parseInt(lesson.substring(0, index).trim());
     }
 
-    private static int getEndingHour(String hour) {
-        hour = hour.replace(".", "");
+    @JsonIgnore
+    public int getEndingHour() {
+        String lesson = get(LESSON).replace(".", "");
 
-        int index = hour.indexOf("-");
+        int index = lesson.indexOf("-");
         if (index == -1) {
-            return Integer.parseInt(hour.trim());
+            return Integer.parseInt(lesson.trim());
         }
-        return Integer.parseInt(hour.substring(index + 1).trim());
+        return Integer.parseInt(lesson.substring(index + 1).trim());
     }
 
     public boolean tryMerge(CoverMessage message) {
-        boolean mergeSuccessful = true;
+        boolean mergeAllowed = true;
         for (int i = 0; i < SIZE; i++) {
-            if (i == HOUR/* || i == COVER_TEXT*/) {
+            if (i == LESSON || i == COVER_TEXT) {
                 continue;
             }
 
             if (!get(i).equals(message.get(i))) {
-                mergeSuccessful = false;
+                mergeAllowed = false;
                 break;
             }
         }
+        if (!mergeAllowed) return false;
 
-        if (get(HOUR).equals("?") || message.get(HOUR).equals("?")) {
-            mergeSuccessful = false;
+        boolean equalCoverTexts = get(COVER_TEXT).equals(message.get(COVER_TEXT));
+        boolean noCoverText = get(COVER_TEXT).equals("");
+        boolean noCompareCoverText = message.get(COVER_TEXT).equals("");
+        if (!equalCoverTexts && !noCoverText && !noCompareCoverText) {
+            return false;
         }
 
-        if (!mergeSuccessful) return false;
+        if (get(LESSON).equals("?") || message.get(LESSON).equals("?")) {
+            return false;
+        }
 
-//        String coverText = get(COVER_TEXT);
-//        String compareCoverText = message.get(COVER_TEXT);
-//        if (!compareCoverText.equals(coverText) && !coverText.equals("") && !compareCoverText.equals("")) {
-//            return false;
-//        }
-//
-//        if (coverText.equals("")) {
-//            set(COVER_TEXT, compareCoverText);
-//        }
-        String hourField = get(HOUR);
-        String compareHourField = message.get(HOUR);
+        //begin of merging:
 
-        if (compareHourField.equals(hourField)) return true; //messages identical
+        if (message.get(LESSON).equals(get(LESSON))) return true; //messages identical
 
-        int compareBeginningHour = getBeginningHour(compareHourField);
-        int compareEndingHour = getEndingHour(compareHourField);
-        int beginningHour = getBeginningHour(hourField);
-        int endingHour = getEndingHour(hourField);
+        int compareBeginningHour = message.getBeginningHour();
+        int compareEndingHour = message.getEndingHour();
+        int beginningHour = getBeginningHour();
+        int endingHour = getEndingHour();
 
-        if (beginningHour <= compareBeginningHour && compareEndingHour <= endingHour) return true; //compareMessage info is included in this message
+        String hourField = get(LESSON);
+        if (endingHour == compareBeginningHour - 1) {
+            set(LESSON, String.format("%s - %s", beginningHour, compareEndingHour));
+        } else if (beginningHour == compareEndingHour + 1) {
+            set(LESSON, String.format("%s - %s", compareBeginningHour, endingHour));
+        } else if (!(beginningHour <= compareBeginningHour && compareEndingHour <= endingHour)) { //return false only if compareMessage hour-range is not included in this message
+            return false;
+        }
 
-        if (hourField.length() > 1) {
-            if (endingHour == compareBeginningHour - 1) {
-                set(CoverMessage.HOUR, hourField.replace(hourField.split("-")[1].trim(), String.valueOf(compareEndingHour)));
-            } else if (beginningHour == compareEndingHour + 1) {
-                set(CoverMessage.HOUR, hourField.replace(hourField.split("-")[0].trim(), String.valueOf(compareBeginningHour)));
+        if (!equalCoverTexts) {
+            String coverTextFormat = "%1$s (Vertretungstext für Std. %2$s)";
+            if (noCoverText) {
+                set(COVER_TEXT, String.format(Locale.GERMANY, coverTextFormat, message.get(COVER_TEXT), message.get(LESSON)));
             } else {
-                return false;
-            }
-        } else {
-            if (endingHour == compareBeginningHour - 1) {
-                set(CoverMessage.HOUR, String.format("%s - %s", hourField, compareEndingHour));
-            } else if (beginningHour == compareEndingHour + 1) {
-                set(CoverMessage.HOUR, String.format("%s - %s", compareBeginningHour, hourField));
-            } else {
-                return false;
+                set(COVER_TEXT, String.format(Locale.GERMANY, coverTextFormat, get(COVER_TEXT), hourField));
             }
         }
 
         return true;
     }
 
+    public Serializer<CoverMessage> serializer() {
+        return new Serializer<CoverMessage>(this) {
+            @Override
+            protected void initMapper(ObjectMapper mapper) {
+                mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+            }
+        };
+    }
+
+    public static Deserializer<CoverMessage> deserializer() {
+        return new Deserializer<CoverMessage>(CoverMessage.class) {
+            @Override
+            protected void initMapper(ObjectMapper mapper) {
+                mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+            }
+        };
+    }
+
+    public static abstract class Serializer<T> {
+
+        private final ObjectMapper mapper;
+        private T object;
+
+        public Serializer(T objectClass) {
+            this.object = objectClass;
+            mapper = new ObjectMapper();
+            initMapper(mapper);
+        }
+
+        protected abstract void initMapper(ObjectMapper mapper);
+
+        public JsonNode toJson() {
+            return mapper.valueToTree(object);
+        }
+
+        public String toJsonString() throws IOException {
+            return mapper.writeValueAsString(object);
+        }
+    }
+
+    public static abstract class Deserializer<T> {
+        private final ObjectMapper mapper;
+        private final Class<T> objectClass;
+
+        public Deserializer(Class<T> objectClass) {
+            this.objectClass = objectClass;
+            mapper = new ObjectMapper();
+            initMapper(mapper);
+        }
+
+        protected abstract void initMapper(ObjectMapper mapper);
+
+        public T fromJson(JsonNode node) throws JsonProcessingException {
+            return mapper.treeToValue(node, objectClass);
+        }
+
+        public T fromJsonString(String jsonString) throws IOException {
+            return mapper.readValue(jsonString, objectClass);
+        }
+    }
+
+
+
     @SuppressWarnings("CloneDoesntCallSuperClone")
     @Override
     public CoverMessage clone() {
         Builder copyBuilder = new Builder(year);
-        System.arraycopy(msgFields, 0, copyBuilder.msgFields, 0, SIZE);
+        System.arraycopy(fields, 0, copyBuilder.msgFields, 0, SIZE);
         return new CoverMessage(copyBuilder);
     }
 
     @Override
     public final String toString() {
-//        StringBuilder stringBuilder = new StringBuilder(SIZE);
-//        stringBuilder.append("Message(").append(year).append(", ").append(SHORT_SDF.format(concernedDate)).append("): ");
-//        for (int i = 0; i < SIZE; i++) {
-//            stringBuilder.append(get(i)).append(", ");
-//        }
-//        return stringBuilder.toString();
         String room = get(ROOM).equals("") ?
                 "" : " in Raum " +
                 (get(ROOM).substring(0, 1).equals("R") ?
@@ -219,13 +287,13 @@ public class CoverMessage implements HBGMessage {
         String newSubject = (get(NEW_SUBJECT).equals("") || get(NEW_SUBJECT).equals(subject)) ?
                 "" : ": " + get(NEW_SUBJECT);
 
-        String hour = get(HOUR).length() > 1 ?
-                get(HOUR) : get(HOUR) + ".";
+        String lesson = get(LESSON).contains("-") ?
+                get(LESSON) : get(LESSON) + ".";
 
 //        String date = SHORT_SDF.format(getConcernedDate().getTime());
 
         String space = subject.equals("") ? "" : " ";
-        return /*date + ": " + */hour + " Std. " + subject + space + kind + newSubject + room;
+        return /*date + ": " + */lesson + " Std. " + subject + space + kind + newSubject + room;
     }
 
     @Override
@@ -236,6 +304,11 @@ public class CoverMessage implements HBGMessage {
             return true;
 
         CoverMessage anotherMessage = (CoverMessage) obj;
-        return toString().equals(anotherMessage.toString());
+        try {
+            return serializer().toJsonString().equals(anotherMessage.serializer().toJsonString());
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

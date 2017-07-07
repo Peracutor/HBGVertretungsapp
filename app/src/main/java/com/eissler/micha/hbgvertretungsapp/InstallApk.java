@@ -20,9 +20,9 @@ public class InstallApk extends File {
 
     private int version;
 
-    public InstallApk(int newVersion, Context context) {
-        super(getInstallApkDirectory(context), String.format(Locale.GERMANY, APK_NAME_FORMAT, newVersion));
-        version = newVersion;
+    public InstallApk(int apkVersion, Context context) {
+        super(getInstallApkDirectory(context), String.format(Locale.GERMANY, APK_NAME_FORMAT, apkVersion));
+        version = apkVersion;
         preference = getPref(context);
     }
 
@@ -32,11 +32,12 @@ public class InstallApk extends File {
     }
 
     public static InstallApk getLastSavedApk(Context context) {
-        int version = -1;
+        int version;
         try {
-            version = getPref(context).getInt(Preferences.Key.APK, -1);
+            version = getPref(context).getInt(Preferences.Key.APK, 1);
         } catch (Exception e) {
             e.printStackTrace();
+            version = 1;
         }
         return new InstallApk(version, context);
     }
@@ -56,11 +57,12 @@ public class InstallApk extends File {
     public void deleteWithToast(Activity activity) {
         boolean deleted = super.delete();
 
-        if (deleted) {
-            Toast.makeText(activity, R.string.act_ma_del_install_apk_success, Toast.LENGTH_LONG).show();
-        } else {
+        if (!deleted) {
             Toast.makeText(activity, R.string.act_ma_del_install_apk_failure, Toast.LENGTH_LONG).show();
         }
+//        else {
+//            Toast.makeText(activity, R.string.act_ma_del_install_apk_success, Toast.LENGTH_LONG).show();
+//        }
     }
 
     //    private InstallApk(String jsonString, Context context) throws JSONException {

@@ -10,7 +10,6 @@ import android.widget.TextView;
 import com.eissler.micha.hbgvertretungsapp.R;
 import com.mikepenz.fastadapter.items.AbstractItem;
 import com.peracutor.hbgserverapi.CoverMessage;
-import com.peracutor.hbgserverapi.ReplacedCoverMessage;
 
 import java.util.List;
 
@@ -24,10 +23,10 @@ import butterknife.ButterKnife;
 
 public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessageItem.ViewHolder> {
 
-    private ReplacedCoverMessage coverMessage;
+    private CoverMessage coverMessage;
     private ViewHolder holder;
 
-    public CoverMessageItem(ReplacedCoverMessage coverMessage) {
+    public CoverMessageItem(CoverMessage coverMessage) {
         this.coverMessage = coverMessage;
     }
 
@@ -44,7 +43,7 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
     }
 
     @Override
-    public void bindView(ViewHolder holder, List payloads) {
+    public void bindView(ViewHolder holder, List<Object> payloads) {
         super.bindView(holder, payloads);
         if (holder != this.holder) {
             this.holder = holder;
@@ -58,9 +57,9 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
         newSubject = newSubject.equals("") ? "" : ": " + newSubject;
         final String room = coverMessage.get(CoverMessage.ROOM);
         final String coverText = coverMessage.get(CoverMessage.COVER_TEXT);
-        final String hour = coverMessage.get(CoverMessage.HOUR);
+        final String lesson = coverMessage.get(CoverMessage.LESSON);
 
-        holder.hourView.setText(hour);
+        holder.lessonView.setText(lesson);
 
         String subject = coverMessage.get(CoverMessage.SUBJECT);
 
@@ -104,7 +103,7 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
         params.setMargins(0, defaultMargin + additionalMargin, 0, defaultMargin);
     }
 
-    public static int pxFromDp(final Context context, final int dp) {
+    private static int pxFromDp(final Context context, final int dp) {
         float density = context.getResources().getDisplayMetrics().density;
         return (int) (dp * density);
     }
@@ -112,7 +111,7 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
 
 
     @Override
-    public CoverMessageItem withSetSelected(boolean selected) {
+    public CoverMessageItem withSetSelected(boolean selected) { // TODO: 28.12.2016 should hold holder-reference? could use FastAdapter.withelectWithItemUpdate()
         setItemBackground(selected);
         return super.withSetSelected(selected);
     }
@@ -134,14 +133,14 @@ public class CoverMessageItem extends AbstractItem<CoverMessageItem, CoverMessag
         return new ViewHolder(view);
     }
 
-    public ReplacedCoverMessage getCoverMessage() {
+    public CoverMessage getCoverMessage() {
         return coverMessage;
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         @BindView(R.id.frameLayout) FrameLayout frameLayout;
         @BindView(R.id.message) TextView messageView;
-        @BindView(R.id.hour) TextView hourView;
+        @BindView(R.id.lesson) TextView lessonView;
         @BindView(R.id.coverText)  TextView coverView;
         @BindView(R.id.roomText) TextView roomText;
         @BindView(R.id.roomNumber) TextView roomView;

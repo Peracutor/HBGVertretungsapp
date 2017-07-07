@@ -12,17 +12,13 @@ import java.util.List;
 
 public class ProcessorDistributor<T> {
 
-    private ProcessorRegisterer<T> processorRegisterer;
     private List<Processor<T>> processors;
 
     public ProcessorDistributor(ProcessorRegisterer<T> processorRegisterer) {
-        this.processorRegisterer = processorRegisterer;
+        processors = processorRegisterer.register().getProcessors();
     }
 
     public void distribute(String action, T object, Context context) {
-        if (processors == null) {
-            processors = processorRegisterer.register().getProcessors();
-        }
         Processor<T> processor = getProcessor(action, context);
 
         if (processor != null) {
@@ -33,7 +29,7 @@ public class ProcessorDistributor<T> {
     private Processor<T> getProcessor(String action, Context context) {
         for (Processor<T> processor : processors) {
             if (processor.getAction().equals(action)) {
-                processor.updateContext(context);
+                processor.setContext(context);
                 return processor;
             }
         }
@@ -65,7 +61,7 @@ public class ProcessorDistributor<T> {
 
         public abstract void process(T object);
 
-        private void updateContext(Context context) {
+        public void setContext(Context context) {
             this.context = context;
         }
 

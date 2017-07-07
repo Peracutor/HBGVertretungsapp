@@ -1,11 +1,11 @@
 package com.peracutor.hbgbackend;
 
-import com.google.android.gcm.server.Message;
+import com.eissler.micha.cloudmessaginglibrary.PushNotification;
+import com.eissler.micha.cloudmessaginglibrary.Recipients;
+import com.eissler.micha.cloudmessaginglibrary.WeekChangeNotification;
 import com.peracutor.hbgserverapi.CoverMessage;
 import com.peracutor.hbgserverapi.HbgAsOfDateDownload;
 import com.peracutor.hbgserverapi.HbgDataDownload;
-import com.peracutor.hbgserverapi.HtmlDownloadHandler;
-import com.peracutor.hbgserverapi.ResultCallback;
 import com.peracutor.hbgserverapi.SortedCoverMessages;
 
 import org.joda.time.DateTime;
@@ -13,17 +13,10 @@ import org.joda.time.DateTimeConstants;
 import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.net.URL;
-import java.net.URLConnection;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.servlet.ServletException;
@@ -41,7 +34,7 @@ import static com.peracutor.hbgbackend.OfyService.ofy;
 public class HbgPollJob extends HttpServlet {
 
 
-    public static final String AS_OF_DATE = "asOfDate";
+    private static final String AS_OF_DATE = "asOfDate";
     private final Logger log = Logger.getLogger(HbgPollJob.class.getName());
     private boolean weekChanged;
 
@@ -58,7 +51,7 @@ public class HbgPollJob extends HttpServlet {
 
             System.out.println("as of = " + asOfDate);
             ofy().save().entity(new SavedAsOfDate(asOfDate, weekNumber, AS_OF_DATE)).now();
-            weekChanged = savedAsOfDate == null || savedAsOfDate.getWeekNumber() != weekNumber;
+            weekChanged = savedAsOfDate != null && savedAsOfDate.getWeekNumber() != weekNumber;
             boolean newDataAvailable = savedAsOfDate == null || weekChanged || savedAsOfDate.getAsOfDate().before(asOfDate);
             System.out.println("newDataAvailable = " + newDataAvailable);
             if (!newDataAvailable) {
@@ -76,21 +69,30 @@ public class HbgPollJob extends HttpServlet {
             System.out.println("classNumber = " + classNumber);
             SortedCoverMessages sortedCoverMessages;
             try {
-                sortedCoverMessages = new HbgDataDownload(classNumber, weekNumber, new DownloadHandler()).executeSync(); // TODO: 03.12.2016 maybe load each class-data async
+                sortedCoverMessages = new HbgDataDownload(classNumber, weekNumber).executeSync();
             } catch (Exception e) {
                 log.warning("Error occurred: " + e.getMessage());
-                if (e.getCause() != null) e.getCause().printStackTrace();
-                resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                e.printStackTrace();
+                if (weekChanged) {
+                    SavedMessages.save(null, classNumber); //override old week data
+                }
                 continue;
             }
 
-            if (sortedCoverMessages == null) {
+            if (weekChanged && sortedCoverMessages != null) {
+                try {
+                    new WeekChangeNotification().send(classNumber, MessagingEndpoint.API_KEY);
+                } catch (IOException e) {
+                    log.warning("e.getMessage() = " + e.getMessage());
+                    e.printStackTrace();
+                }
+            } else if (sortedCoverMessages == null) {
                 log.info("No data for classnumber " + classNumber);
-                continue;
             }
 
-            if (weekChanged) {
+            if (weekChanged || sortedCoverMessages == null) {
                 SavedMessages.save(sortedCoverMessages, classNumber); //override old week data
+                continue;
             } else {
                 sortedCoverMessages = sortOutNewMessages(sortedCoverMessages, classNumber);
             }
@@ -103,33 +105,27 @@ public class HbgPollJob extends HttpServlet {
                 if (timeToLive < 0) {
                     continue;
                 }
-                Map<String, String> data = message.toMap();
-                data.put(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_PUSH);
-                Message.Builder builder = new Message.Builder()
-                        .timeToLive(timeToLive)
-                        .setData(data);
 
                 try {
-                    String condition = String.format(Locale.GERMANY, "'%s' in topics || '%s' in topics", message.getTopic(classNumber), classNumber + "-no_whitelist");
-                    log.info("condition = " + condition);
-                    MessagingEndpoint.sendToMultipleTopics(condition, builder.build());
-                } catch (IOException e1) {
-                    log.warning("e1.getMessage() = " + e1.getMessage());
-                    e1.printStackTrace();
+                    Recipients recipients = message.getCondition(classNumber);
+                    new PushNotification(message.serializer().toJsonString())
+                            .send(recipients, timeToLive, MessagingEndpoint.API_KEY);
+                } catch (IOException e) {
+                    log.warning("e.getMessage() = " + e.getMessage());
+                    e.printStackTrace();
                     unsentMessages.add(coverMessage);
-
-                    resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 }
             }
 
             if (unsentMessages.size() > 0) {
                 SortedCoverMessages savedCoverMessages = SavedMessages.load(classNumber);
-                unsentMessages.forEach(savedCoverMessages::remove);
+                for (CoverMessage unsentMessage : unsentMessages) {
+                    savedCoverMessages.remove(unsentMessage);
+                }
                 SavedMessages.save(savedCoverMessages, classNumber);
             }
         }
         resp.setStatus(HttpServletResponse.SC_OK);
-
         resp.getOutputStream().println("Finished");
 
     }
@@ -171,42 +167,7 @@ public class HbgPollJob extends HttpServlet {
         return sortedCoverMessages;
     }
 
-    private static class DownloadHandler implements HtmlDownloadHandler {
-
-        static final char[] UMLAUTS = "äöüÄÖÜß".toCharArray();
-
-        @Override
-        public void asyncDownload(String urlString, Charset charset, ResultCallback<String> callback) {
-        }
-
-        @Override
-        public String syncDownload(String urlString, Charset charset) throws Exception {
-            java.net.URL url = new URL(urlString);
-            URLConnection con = url.openConnection();
-            Reader r = new InputStreamReader(con.getInputStream(), charset);
-            StringBuilder buf = new StringBuilder();
-            while (true) {
-                int ch = r.read();
-                if (ch < 0) {
-                    break;
-                } else if (isUmlaut(ch)) {
-                    buf.append("%").append(ch).append("%");
-                } else {
-                    buf.append((char) ch);
-                }
-            }
-            return buf.toString();
-        }
-
-        private boolean isUmlaut(int ch) {
-            boolean isUmlaut = false;
-            for (char umlaut : UMLAUTS) {
-                if ((int) umlaut == ch) {
-                    isUmlaut = true;
-                    break;
-                }
-            }
-            return isUmlaut;
-        }
-    }
+//        public static void main(String[] args) throws Exception {
+//
+//    }
 }

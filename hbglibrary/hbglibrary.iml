@@ -28,5 +28,8 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" exported="" name="jsoup-1.9.1" level="project" />
+    <orderEntry type="library" exported="" name="jackson-core-2.8.6" level="project" />
+    <orderEntry type="library" exported="" name="jackson-databind-2.8.6" level="project" />
+    <orderEntry type="library" exported="" name="jackson-annotations-2.8.0" level="project" />
   </component>
 </module>

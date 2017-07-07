@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <CheckBoxPreference
+        android:widgetLayout="@layout/switch_compat"
+        android:title="Benachrichtigungston"
+        android:key="notification_sound"
+        android:defaultValue="false"
+        android:summary="Ton bei Benachrichtigungen abspielen"
+        />
+
+    <RingtonePreference
+        android:title="Benachrichtigungston wählen"
+        android:showDefault="true"
+        android:key="notification_sound_uri"
+        android:ringtoneType="notification"
+        android:dependency="notification_sound"
+        android:summary="Ton für Benachrichtigungen festlegen"
+        />
+
+    <CheckBoxPreference
+        android:widgetLayout="@layout/switch_compat"
+        android:title="Vibration"
+        android:key="notification_vibration"
+        android:defaultValue="true"
+        android:summary="Gerät bei Benachrichtigungen vibrieren lassen"
+        />
+
+    <CheckBoxPreference
+        android:widgetLayout="@layout/switch_compat"
+        android:title="Licht"
+        android:key="notification_light"
+        android:defaultValue="true"
+        android:summary="LED bei Benachrichtigungen blinken lassen"
+        />
+
+    <ListPreference
+        android:title="Lichtfarbe"
+        android:key="notification_light_color"
+        android:entryValues="@array/notification_light_color_values"
+        android:entries="@array/notification_light_color_entries"
+        android:dependency="notification_light"
+        android:summary="Farbe der LED festlegen - je nach Gerät sind manche Farben nicht unterstützt"
+        />
+
+</PreferenceScreen>

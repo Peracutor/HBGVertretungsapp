@@ -54,10 +54,6 @@ public class Notifications {
         System.out.println("Notifications disabled");
     }
 
-    public void reset() {
-        enable();
-    }
-
     public void reset(int requestCode, long millis) {
         setAlarm(requestCode, millis);
     }

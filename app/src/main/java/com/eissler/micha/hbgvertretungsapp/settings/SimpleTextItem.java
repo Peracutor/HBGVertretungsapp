@@ -1,17 +1,15 @@
 package com.eissler.micha.hbgvertretungsapp.settings;
 
-import android.support.v7.widget.RecyclerView;
 import android.view.View;
-import android.widget.CheckBox;
 import android.widget.TextView;
 
 import com.eissler.micha.hbgvertretungsapp.R;
+import com.eissler.micha.hbgvertretungsapp.util.CheckBoxItem;
 import com.mikepenz.fastadapter.FastAdapter;
 
 import java.util.List;
 
 import butterknife.BindView;
-import butterknife.ButterKnife;
 
 /**
  * Created by Micha.
@@ -34,11 +32,11 @@ public class SimpleTextItem extends CheckBoxItem<SimpleTextItem, SimpleTextItem.
 
     @Override
     public int getLayoutRes() {
-        return R.layout.row_layout_whitelist;
+        return R.layout.row_layout_simple_text;
     }
 
     @Override
-    public void bindView(ViewHolder holder, List payloads) {
+    public void bindView(ViewHolder holder, List<Object> payloads) {
         super.bindView(holder, payloads);
         holder.textView.setText(text);
 
@@ -53,20 +51,13 @@ public class SimpleTextItem extends CheckBoxItem<SimpleTextItem, SimpleTextItem.
         return text;
     }
 
-    @Override
-    protected CheckBox getCheckBox(ViewHolder holder) {
-        return holder.checkBox;
-    }
-
-    class ViewHolder extends RecyclerView.ViewHolder {
+    class ViewHolder extends CheckBoxItem.ViewHolder {
         @BindView(R.id.textView)
         TextView textView;
-        @BindView(R.id.checkbox)
-        CheckBox checkBox;
 
         public ViewHolder(View itemView) {
             super(itemView);
-            ButterKnife.bind(this, itemView);
+//            ButterKnife.bind(this, itemView);
         }
     }
 }

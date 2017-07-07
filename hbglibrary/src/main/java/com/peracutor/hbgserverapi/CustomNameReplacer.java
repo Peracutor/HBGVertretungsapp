@@ -27,13 +27,24 @@ public class CustomNameReplacer implements Replacer {
 
     @Override
     public ReplacedCoverMessage replace(CoverMessage messageToReplace) {
-        ReplacedCoverMessage replacedCoverMessage = new ReplacedCoverMessage(messageToReplace);
-        replacedCoverMessage.setReplacedSubject(replace(messageToReplace.get(CoverMessage.SUBJECT)));
-        replacedCoverMessage.setReplacedNewSubject(replace(messageToReplace.get(CoverMessage.NEW_SUBJECT)));
+        ReplacedCoverMessage replacedCoverMessage;
+        String subject;
+        String newSubject;
+        if (messageToReplace instanceof ReplacedCoverMessage) {
+            replacedCoverMessage = (ReplacedCoverMessage) messageToReplace;
+            subject = replacedCoverMessage.getOriginal(CoverMessage.SUBJECT);
+            newSubject = replacedCoverMessage.getOriginal(CoverMessage.NEW_SUBJECT);
+        } else {
+            replacedCoverMessage = new ReplacedCoverMessage(messageToReplace);
+            subject = messageToReplace.get(CoverMessage.SUBJECT);
+            newSubject = messageToReplace.get(CoverMessage.NEW_SUBJECT);
+        }
+        replacedCoverMessage.setReplaced(CoverMessage.SUBJECT, getCustomName(subject));
+        replacedCoverMessage.setReplaced(CoverMessage.NEW_SUBJECT, getCustomName(newSubject));
         return replacedCoverMessage;
     }
 
-    private String replace(String subject) {
+    private String getCustomName(String subject) {
         if (subject.equals("")) {
             return subject;
         }

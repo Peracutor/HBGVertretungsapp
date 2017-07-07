@@ -6,16 +6,13 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.net.Uri;
-import android.os.Build;
 import android.support.v7.app.AlertDialog;
 
 import com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity;
+import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.koushikdutta.async.future.Future;
-import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
-import com.peracutor.hbgserverapi.DownloadException;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -37,7 +34,7 @@ public class UpdateTask {
     public UpdateTask(final int newVersion, String apkUrl, final Activity activity) {
         this.activity = activity;
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+        App.lockOrientation(activity);
 
         final ProgressDialog downloadProgress = new ProgressDialog(activity);
         downloadProgress.setTitle("HBG-App Update");
@@ -48,31 +45,26 @@ public class UpdateTask {
         downloadProgress.setMax(100);
         downloadProgress.setProgress(0);
 
-        downloadProgress.setButton(DialogInterface.BUTTON_NEGATIVE, "Abbrechen", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                interrupted = true;
+        downloadProgress.setButton(DialogInterface.BUTTON_NEGATIVE, "Abbrechen", (dialog, which) -> {
+            interrupted = true;
 
 //                if (apkUrlDownload != null) {
 //                    apkUrlDownload.cancel();
 //                }
 
-                if (apkDownload != null) {
-                    apkDownload.cancel();
-                }
+            if (apkDownload != null) {
+                apkDownload.cancel();
+            }
 
-                if (installApk != null) {
-                    //noinspection ResultOfMethodCallIgnored
-                    installApk.delete();
-                }
+            if (installApk != null) {
+                //noinspection ResultOfMethodCallIgnored
+                installApk.delete();
+            }
 
-                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
-                }
+            App.unlockOrientation(activity);
 
-                if ((activity instanceof MainActivity && !MainActivity.mainActivityPaused) || (activity instanceof SettingsActivity && !SettingsActivity.settingsActivityPaused)) {
-                    App.dialog("Abbruch", "Der Download wurde abgebrochen.", activity).show();
-                }
+            if ((activity instanceof MainActivity && !MainActivity.mainActivityPaused) || (activity instanceof SettingsActivity && !SettingsActivity.settingsActivityPaused)) {
+                App.dialog("Abbruch", "Der Download wurde abgebrochen.", activity).show();
             }
         });
         System.out.println("show");
@@ -96,25 +88,20 @@ public class UpdateTask {
                     .progressDialog(downloadProgress)
                     .noCache()
                     .write(outputStream)
-                    .setCallback(new FutureCallback<FileOutputStream>() {
-                        @Override
-                        public void onCompleted(Exception e, final FileOutputStream outStreamUnused) {
-                            if (e != null) {
-                                showError(e);
-                                return;
-                            }
+                    .setCallback((e, outStreamUnused) -> {
+                        if (e != null) {
+                            showError(e);
+                            return;
+                        }
 
-                            if (Build.VERSION.SDK_INT >= 18) {
-                                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
-                            }
+                        App.unlockOrientation(activity);
 
-                            installApk.save();
+                        installApk.save();
 
-                            if ((activity instanceof MainActivity && !MainActivity.mainActivityPaused) || (activity instanceof SettingsActivity && !SettingsActivity.settingsActivityPaused)) {
-                                AlertDialog.Builder dialog = getReadyForInstallationBuilder(activity, installApk);
+                        if ((activity instanceof MainActivity && !MainActivity.mainActivityPaused) || (activity instanceof SettingsActivity && !SettingsActivity.settingsActivityPaused)) {
+                            AlertDialog.Builder dialog = getReadyForInstallationBuilder(activity, installApk);
 
-                                showDialog(dialog);
-                            }
+                            showDialog(dialog);
                         }
                     });
         }
@@ -123,37 +110,22 @@ public class UpdateTask {
 
     static AlertDialog.Builder getReadyForInstallationBuilder(final Activity activity, final InstallApk installApk) {
         return App.dialog("Bereit zur Installation", "Das Update ist bereit zur Installation.\nJetzt installieren?", activity)
-                                                            .setPositiveButton("Jetzt", new DialogInterface.OnClickListener() {
-                                                                @Override
-                                                                public void onClick(DialogInterface dialog1, int which) {
-                                                                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                                                                    intent.setDataAndType(Uri.fromFile(installApk), "application/vnd.android.package-archive");
-                                                                    activity.startActivity(intent);
-                                                                }
+                                                            .setPositiveButton("Jetzt", (dialog1, which) -> {
+                                                                Intent intent = new Intent(Intent.ACTION_VIEW);
+                                                                intent.setDataAndType(Uri.fromFile(installApk), "application/vnd.android.package-archive");
+                                                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                                activity.startActivity(intent);
                                                             })
-                                                            .setNegativeButton("Später", new DialogInterface.OnClickListener() {
-                                                                @Override
-                                                                public void onClick(DialogInterface dialog1, int which) {
-                                                                    if ((!(activity instanceof MainActivity) || MainActivity.mainActivityPaused) && (!(activity instanceof SettingsActivity) || SettingsActivity.settingsActivityPaused)) {
-                                                                        App.dialog("Update später installieren", "Um das Update später zu installieren, wähle Einstellungen --> Nach Updates suchen", activity)
-                                                                                .show();
-                                                                    }
-                                                                }
-                                                            })
-                                                            .setNeutralButton("APK löschen", new DialogInterface.OnClickListener() {
-                                                                @Override
-                                                                public void onClick(DialogInterface dialogInterface, int i) {
-                                                                    App.dialog("Löschen bestätigen", "Bist du dir sicher, dass du die heruntergeladene Update-Datei löschen möchtest?", activity)
-                                                                            .setPositiveButton("Löschen", new DialogInterface.OnClickListener() {
-                                                                                @Override
-                                                                                public void onClick(DialogInterface dialogInterface, int i) {
-                                                                                    installApk.deleteWithToast(activity);
-                                                                                }
-                                                                            })
-                                                                            .setNegativeButton("Abbrechen", null)
+                                                            .setNegativeButton("Später", (dialog1, which) -> {
+                                                                if ((!(activity instanceof MainActivity) || MainActivity.mainActivityPaused) && (!(activity instanceof SettingsActivity) || SettingsActivity.settingsActivityPaused)) {
+                                                                    App.dialog("Update später installieren", "Um das Update später zu installieren, wähle Einstellungen --> Nach Updates suchen", activity)
                                                                             .show();
                                                                 }
-                                                            });
+                                                            })
+                                                            .setNeutralButton("APK löschen", (dialogInterface, i) -> App.dialog("Löschen bestätigen", "Bist du dir sicher, dass du die heruntergeladene Update-Datei löschen möchtest?", activity)
+                                                                    .setPositiveButton("Löschen", (dialogInterface1, i1) -> installApk.deleteWithToast(activity))
+                                                                    .setNegativeButton("Abbrechen", null)
+                                                                    .show());
     }
 
     private void showError(Exception e) {
@@ -175,20 +147,15 @@ public class UpdateTask {
             downloadProgress.dismiss();
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
-        }
+        App.unlockOrientation(activity);
 
         if ((!(activity instanceof MainActivity) || MainActivity.mainActivityPaused) && (!(activity instanceof SettingsActivity) || SettingsActivity.settingsActivityPaused)) {
             return;
         }
 
-        activity.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (builder != null) {
-                    builder.show();
-                }
+        activity.runOnUiThread(() -> {
+            if (builder != null) {
+                builder.show();
             }
         });
     }

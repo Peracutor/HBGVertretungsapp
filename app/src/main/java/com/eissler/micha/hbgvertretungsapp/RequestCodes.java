@@ -12,10 +12,15 @@ public class RequestCodes {
     public static final int ALARM_TEST_PUSH_FAILED = 4;
     public static final int ALARM_REQUEST_TEST_PUSH = 5;
 
-    public static final int ACTIVITY_OPEN_NOTIFICATION = 6;
+
+    public static final int ACTION_OPEN_NOTIFICATION = 50;
+    public static final int ACTION_UPDATE_APP = 51;
 
     public static final int NOTIFICATION_PULL = 100;
-    public static final int NOTIFICATION_PUSH = 101;
-    public static final int NOTIFICATION_UPDATE_AVAILABLE = 102;
-    public static final int NOTIFICATION_TEST_PUSH_FAIL = 103;
+    public static final int NOTIFICATION_UPDATE_AVAILABLE = 101;
+    public static final int NOTIFICATION_TEST_PUSH_FAIL = 102;
+//    public static final int NOTIFICATION_WEEK_CHANGE = 104;
+
+    public static final int NOTIFICATION_PUSH = 200; //keep next 99 free
+
 }

@@ -6,24 +6,41 @@
 
 package com.peracutor.hbgbackend;
 
-import com.google.android.gcm.server.Message;
+import com.eissler.micha.cloudmessaginglibrary.InfoNotification;
+import com.eissler.micha.cloudmessaginglibrary.Recipients;
+import com.eissler.micha.cloudmessaginglibrary.SubmittedNotification;
+import com.eissler.micha.cloudmessaginglibrary.TimeToLive;
+import com.eissler.micha.cloudmessaginglibrary.UpdateAvailableNotification;
+import com.eissler.micha.cloudmessaginglibrary.VersionInfo;
 import com.google.api.server.spi.config.Api;
 import com.google.api.server.spi.config.ApiMethod;
 import com.google.api.server.spi.config.ApiNamespace;
+import com.google.api.server.spi.response.CollectionResponse;
+import com.google.apphosting.api.ApiProxy;
+import com.google.common.io.CharStreams;
+import com.googlecode.objectify.cmd.QueryExecute;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.io.InputStreamReader;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Named;
+import javax.mail.MessagingException;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+import static com.peracutor.hbgbackend.OfyService.ofy;
 
 /**
  * An endpoint to send messages to devices registered with the backend
@@ -47,12 +64,12 @@ public class MessagingEndpoint {
     private static final Logger log = Logger.getLogger(MessagingEndpoint.class.getName());
 
     /** Api Keys can be obtained from the google cloud console */
-    private static final String API_KEY = System.getProperty("gcm.api.key");
+    static final String API_KEY = System.getProperty("gcm.api.key");
 
     /**
      * Send to the first 10 devices (You can modify this to send to any number of devices or a specific device)
      *
-     * @param message The message to send
+     *  message The message to send
      */
 //    public void sendMessage(@Named("message") String message) throws IOException {
 //        if(message == null || message.trim().length() == 0) {
@@ -92,15 +109,18 @@ public class MessagingEndpoint {
 //        }
 //    }
 
-    public static void sendMessageTo(String to, Message message) throws IOException {
-        boolean matches = to.matches("/topics/[a-zA-Z0-9-_.~%]+");
-        log.info("sending to topic? " + matches);
+//    public CollectionResponse<Byte> test(@Named("string") String string) throws IOException {
+//    }
 
-        com.peracutor.hbgbackend.Result result = new Sender(API_KEY).sendMessage(message, to, 3);
-        log.info("result = " + result.toString());
-        log.info("result.getErrorCodeName() = " + result.getErrorCodeName());
+//    public static void sendMessageTo(String to, Message message) throws IOException {
+//        boolean matches = to.matches("/topics/[a-zA-Z0-9-_.~%]+");
+//        log.info("sending to topic? " + matches);
+//
+//        Result result = new Sender(API_KEY).sendMessage(message, to, 3);
+//        log.info("result = " + result.toString());
+//        log.info("result.getErrorCodeName() = " + result.getErrorCodeName());
 
-//        com.peracutor.hbgbackend.Result send = new Sender(API_KEY).sendMessage(message, "eRhKUU_jm5o:APA91bHjNYuFl8ZmLm8EGTEFblRG4Mm64GukxA-q2OMJ83NForOZ7oomNBRZnDdFcyw7MzgUG_19fUaj-vTt6nYcGBIIvAiZ-GrZ8ukpaLewTBGLsjwZOJrHzgwvMKFHCR-yDNYAg6vi", 1);
+//        com.eissler.micha.backend_library.Result send = new Sender(API_KEY).sendMessage(message, "eRhKUU_jm5o:APA91bHjNYuFl8ZmLm8EGTEFblRG4Mm64GukxA-q2OMJ83NForOZ7oomNBRZnDdFcyw7MzgUG_19fUaj-vTt6nYcGBIIvAiZ-GrZ8ukpaLewTBGLsjwZOJrHzgwvMKFHCR-yDNYAg6vi", 1);
 //        log.info("send = " + send);
 
 
@@ -124,55 +144,88 @@ public class MessagingEndpoint {
 //                log.warning("Error when sending message : " + error);
 //            }
 //        }
-    }
-
-    public static void sendToMultipleTopics(String condition, Message message) throws IOException {
-        com.peracutor.hbgbackend.Result result = new Sender(API_KEY).sendMessageMultipleTopics(message, condition, 3);
-        log.info("result = " + result.toString());
-        log.info("result.getErrorCodeName() = " + result.getErrorCodeName());
-    }
+//    }
 
 
-    public void sendNotification(@Nullable @Named("to") String to, @Nullable @Named("condition") String condition, @Named("titleNoUmlauts") String title, @Named("bodyNoUmlauts") String body, @Nullable @Named("imageUrl") String imageUrl, @Nullable @Named("endDate") String endDate/*, @Nullable @Named("collapseKey") String collapseKey*/) throws IOException, ParseException {
-
-        Date date = null;
-        if (endDate != null) {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY);
-            date = dateFormat.parse(endDate);
+    public CollectionResponse<SubmittedNotification> deleteSubmittedMessages(@com.google.api.server.spi.config.Nullable @Named("count") Integer count) {
+        QueryExecute<SavedSubmittedNotification> loadType;
+        if (count != null && count > 0) {
+            loadType = ofy().load().type(SavedSubmittedNotification.class).limit(count);
+        } else {
+            loadType = ofy().load().type(SavedSubmittedNotification.class);
         }
-        sendNotification(to, condition, title, body, imageUrl, date);
+        List<SavedSubmittedNotification> savedSubmittedNotifications = loadType.list();
+        ArrayList<SubmittedNotification> notifications = new ArrayList<>(savedSubmittedNotifications.size());
+        log.info("Following submitted messages are currently pending:");
 
+        for (SavedSubmittedNotification savedNotification : savedSubmittedNotifications) {
+            SubmittedNotification notification = savedNotification.getNotification();
+            notifications.add(notification);
+            log.info("    " + notification.getTitle());
+        }
+        return CollectionResponse.<SubmittedNotification>builder().setItems(notifications).build();
     }
 
-    private static void sendNotification(String to, String condition, String title, String body, String imageUrl, Date date) throws IOException {
-        Map<String, String> notificationData = new HashMap<>(4);
-        System.out.println("Charset.defaultCharset() = " + Charset.defaultCharset());
-//        title = replaceUmlauts(title);
-//        body = replaceUmlauts(body);
+    @ApiMethod
+    public void submitNotification(SubmittedNotification notification) throws MessagingException, IOException {
+        Long key = SavedSubmittedNotification.save(notification);
 
-        notificationData.put("title", title);
-        notificationData.put("body", body);
-        System.out.println("title = " + title);
-        System.out.println("body = " + body);
-        if (imageUrl != null) notificationData.put("imageUrl", imageUrl);
+        Session session = Session.getDefaultInstance(new Properties(), null);
+        MimeMessage adminMessage = new MimeMessage(session);
+        adminMessage.setFrom(new InternetAddress("arkanseidos@gmail.com", "HBG-Vertretungsapp"));
+        adminMessage.setSubject("HBG-Vertretungsapp: Neue Nachricht eingereicht");
+        adminMessage.addRecipient(MimeMessage.RecipientType.TO, new InternetAddress("admins"));
 
-        notificationData.put(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_INFO_NOTIFICATION);
+        MimeMessage message = new MimeMessage(session);
+        message.setFrom(new InternetAddress("arkanseidos@gmail.com", "HBG-Vertretungsapp"));
+        message.setSubject("HBG-App: Neue Nachricht eingereicht");
+        message.addRecipient(MimeMessage.RecipientType.TO, new InternetAddress("m.eissler@hotmail.de"));
+        String filepath = notification.getImageUrl() != null ? "email_with_image.html" : "email_no_image.html";
+        String emailHtml = String.format(getFromFile(filepath),
+                notification.getTitle(),
+                notification.getContent(),
+                key,
+                notification.getImageUrl());
 
-        Message.Builder message = new Message.Builder()
-                .setData(notificationData);
+        message.setContent(emailHtml, "text/html; charset=utf-8");
 
+        String adminMessageText = String.format(getFromFile("email_admin_message.txt"),
+                notification.getTitle(),
+                notification.getContent(),
+                key,
+                notification.getImageUrl() != null ? "Bild-URL: " +  notification.getImageUrl() : "");
 
-        if (date != null) {
-            int timeToLive = (int) ((date.getTime() - new Date().getTime()) / 60);
-            if (timeToLive < 0) {
-                log.warning("endDate is in the past, not sending message");
-                return;
-            }
-            message.timeToLive(timeToLive);
+        try {
+//            Transport.send(message);// TODO: 29.06.2017 change recipient mail-adress and remove the line below
+            adminMessageText += "\n\n\nMail wurde nur an Admin geschickt.";
+        } catch (ApiProxy.OverQuotaException e) {
+            e.printStackTrace();
+            adminMessageText += "\n\n\nACHTUNG: Quota-Limit erreicht, Mail wurde nur an Admin geschickt!";
         }
 
-        if (to != null) sendMessageTo(to, message.build());
-        else if (condition != null) sendToMultipleTopics(condition, message.build());
+        adminMessage.setText(adminMessageText, "utf-8");
+        Transport.send(adminMessage);
+    }
+
+    public static String getFromFile(String pathname) throws IOException {
+        return CharStreams.toString(new InputStreamReader(new FileInputStream(new File("WEB-INF/" + pathname)), "utf-8"));
+    }
+
+    public void sendNotification(@Nullable @Named("to") String to, @Named("title") String title, @Named("body") String body, @Nullable @Named("imageUrl") String imageUrl, @Nullable @Named("endDate") String endDate) throws IOException, ParseException {
+        InfoNotification notification = new InfoNotification.Builder()
+                .setTitle(title)
+                .setContent(body)
+                .setImageUrl(imageUrl)
+                .build();
+
+        Recipients recipients = new Recipients().to(to);
+        TimeToLive timeToLive;
+        if (endDate != null) timeToLive = new TimeToLive(endDate, "dd.MM.yy HH:mm");
+        else timeToLive = null;
+
+        notification.send(recipients, timeToLive, API_KEY);
+//        Map<String, String> notification = bundleNotification(to, condition, title, body, imageUrl, endDate);
+//        sendNotification(notification);
     }
 
 //    private String convertToUTF8(String s) {
@@ -181,45 +234,23 @@ public class MessagingEndpoint {
 //
 
 
-    public void sendTestPush(@Named("token") String token) {
+    public void sendTestPush(@Named("token") String token) throws IOException {
         log.info("MessagingEndpoint.sendTestPush");
 
         Calendar calendar = Calendar.getInstance(Locale.GERMANY);
         calendar.add(Calendar.SECOND, 30);
 
-        try {
-            sendNotification(token, null, "Testbenachrichtigung", "Das ist eine Testnachricht", null, calendar.getTime());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-//        new RegistrationEndpoint().registerDevice(token, acraID);
+        InfoNotification notification = new InfoNotification.Builder()
+                .setTitle("Testbenachrichtigung")
+                .setContent("Das ist eine Testnachricht")
+                .build();
+
+        notification.send(new Recipients().to(token), new TimeToLive(calendar.getTime()), API_KEY);
     }
 
     @ApiMethod
-    public void sendUpdateAvailablePush() {
-        System.out.println("MessagingEndpoint.sendUpdateAvailablePush");
-        RegistrationEndpoint.VersionInfo versionInfo = new RegistrationEndpoint().getVersionInfo();
-        Message.Builder builder = new Message.Builder()
-                .addData(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_UPDATE_AVAILABLE)
-                .addData("versionName", versionInfo.getVersionName())
-                .addData("versionNumber", String.valueOf(versionInfo.getVersionNumber()))
-                .addData("apkUrl", versionInfo.getApkUrl());
-        try {
-            sendMessageTo("/topics/global", builder.build());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public void sendUpdateAvailablePush() throws IOException {
+        VersionInfo versionInfo = new RegistrationEndpoint().getVersionInfo();
+        new UpdateAvailableNotification(versionInfo).send(API_KEY);
     }
-
-
-//    public void sendMessageToAcraId(@Named("acraId") String acraId, @Named("message") String message) {
-//        RegistrationRecord record = findRecordByAcraId(acraId);
-//        if (record == null) {
-//            log.warning("Not sending message - no record for acraId: " + acraId);
-//            return;
-//        }
-//
-//        sendMessageTo(new Message.Builder().addData(MessageConstants.MESSAGE_ACTION, MessageConstants.ACTION_INFO_NOTIFICATION)record.getRegId());
-//
-//    }
 }

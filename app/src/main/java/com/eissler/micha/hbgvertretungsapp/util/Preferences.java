@@ -37,6 +37,7 @@ public class Preferences implements SharedPreferences {
         SELECTED_CLASS("classSelection"),
         VERSION("version"),
         SUBSCRIBED_TOPICS("subscribed_topics"),
+        NOTIFICATION_SWITCH("notification_switch"),
         APK("APK"),
         TOKEN_SENT("token_sent"),
         NOTIFICATION_SERVICE_BACKOFF("notification_service_backoff"),
@@ -48,7 +49,20 @@ public class Preferences implements SharedPreferences {
         ALARM_WAKEUP("alarm_wake_up"),
         TEST_PUSH_PROMPTED("test_push_prompted"),
         AUTO_NAME("auto_name_subjects"),
-        AUTO_NAME_PATTERN("auto_name_pattern");
+        AUTO_NAME_PATTERN("auto_name_pattern"),
+
+        NOTIFICATION_VIBRATION("notification_vibration"),
+        NOTIFICATION_LIGHT("notification_light"),
+        NOTIFICATION_SOUND("notification_sound"),
+        NOTIFICATION_LIGHT_COLOR("notification_light_color"),
+        NOTIFICATION_SOUND_URI("notification_sound_uri"),
+        LAST_PUSH_ID("last_push_id"),
+        WEEK_CHANGE_NOTIFICATION("week_change_notification"),
+        PUSH_INFO_SHOWN("push_info_shown"),
+        WHITELIST_DONT_PROMPT("whitelist_dont_prompt"),
+        DONT_PROMPT_FILTER_MODE("dont_prompt_filter_mode"),
+        SHOW_WHITELIST_CONFIRMATION_PROMPT("show_whitelist_confirmation_prompt"),
+        LAST_NOTIFICATION_ID("last_notification_id");
 
         private String key;
 

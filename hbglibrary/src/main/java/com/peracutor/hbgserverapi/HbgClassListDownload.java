@@ -2,6 +2,7 @@ package com.peracutor.hbgserverapi;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -21,7 +22,7 @@ public class HbgClassListDownload extends HbgDownload<List<String>> {
     }
 
     @Override
-    protected List<String> evaluate(String htmlText) {
+    protected List<String> evaluate(String htmlText) throws Exception {
         int occ = htmlText.indexOf("\"05a");
         String[] seq = htmlText.substring(occ, occ + 350).split(";", 2);
         String[] classes = seq[0].split(",");
@@ -31,7 +32,8 @@ public class HbgClassListDownload extends HbgDownload<List<String>> {
         }
         classes[classes.length - 1] = classes[classes.length - 1].substring(1, classes[classes.length - 1].length() - 2);
 
-        return new ArrayList<>(Arrays.asList(classes)); //not returning Arrays.asList because is unmodifiable
-        // TODO: 16.12.2016 find solution for class-numbers
+        ArrayList<String> classesList = new ArrayList<>(Arrays.asList(classes));
+        classesList.add(0, null); //setting 0 index to null, so that indices can be used as class-numbers
+        return Collections.unmodifiableList(classesList);
     }
 }

@@ -1,7 +1,5 @@
 package com.eissler.micha.hbgvertretungsapp;
 
-import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -27,9 +25,10 @@ import com.eissler.micha.hbgvertretungsapp.evaluation.DateHeaderItem;
 import com.eissler.micha.hbgvertretungsapp.evaluation.DownloadHandler;
 import com.eissler.micha.hbgvertretungsapp.settings.Blacklist;
 import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
+import com.eissler.micha.hbgvertretungsapp.util.MultiSelectHelper;
+import com.google.firebase.crash.FirebaseCrash;
 import com.mikepenz.fastadapter.IItem;
-import com.mikepenz.fastadapter.adapters.FastItemAdapter;
-import com.mikepenz.fastadapter_extensions.ActionModeHelper;
+import com.mikepenz.fastadapter.commons.adapters.FastItemAdapter;
 import com.peracutor.hbgserverapi.CoverMessage;
 import com.peracutor.hbgserverapi.HBGMessage;
 import com.peracutor.hbgserverapi.HbgDataDownload;
@@ -38,6 +37,7 @@ import com.peracutor.hbgserverapi.ReplacedCoverMessage;
 import com.peracutor.hbgserverapi.ResultCallback;
 import com.peracutor.hbgserverapi.SortedCoverMessages;
 
+import org.acra.ACRA;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
@@ -51,23 +51,19 @@ import static android.support.v7.widget.RecyclerView.SCROLL_STATE_IDLE;
 
 public class FragmentPage extends Fragment {
 
-    static final String THIS_WEEK = "Diese Woche";
-
     private RecyclerView recyclerView;
     private ViewGroup view;
     private SortedCoverMessages mSortedCoverMessages;
-//    private boolean noData = false;
     private Integer position;
     private int weekNumber;
     private ProgressBar progressBar;
 //    private int initialized = 0;
 //    private Event.LoadPermission waitingForInit;
-    private ActionModeHelper actionModeHelper;
     private FastItemAdapter<IItem> fastAdapter;
     private ErrorView errorView;
     private boolean loadingOrLoaded = false;
-//    private Menu actionMenu;
-    private App.WaitFor<Activity> onAttach;
+    private MultiSelectHelper<IItem, FastItemAdapter<IItem>> multiSelectHelper;
+    private Throwable pendingError;
 
 
     @Override
@@ -81,47 +77,16 @@ public class FragmentPage extends Fragment {
         if (fastAdapter == null) {
             fastAdapter = new FastItemAdapter<>();
             fastAdapter.setHasStableIds(true);
-            fastAdapter.withSelectable(true);
-            fastAdapter.withSelectOnLongClick(true);
-            fastAdapter.withMultiSelect(true);
 //            fastAdapter.withPositionBasedStateManagement(true);
 
-            actionModeHelper = new ActionModeHelper(fastAdapter, R.menu.menu_cab, new ActionBarCallback());
-
-            //Called prior to selection, if returning true, click is consumed (not
-            fastAdapter.withOnPreClickListener((v, adapter, item, position) -> {
+            multiSelectHelper = new MultiSelectHelper<>(fastAdapter);
+            fastAdapter = multiSelectHelper.setupMultiSelectAdapter((AppCompatActivity) getActivity(), R.menu.menu_cab, new ActionBarCallback(), null, (v, adapter, item, position) -> {
                 if (item instanceof DateHeaderItem) {
-                    return true;
-                }
-                App.logUserInput("List-Item at position " + position + " was clicked");
-
-                System.out.println("item.isSelected() = " + item.isSelected());
-
-                if (getActionMode() != null) {
-                    Boolean onClick = actionModeHelper.onClick(item);
-
-                    if (onClick != null && !onClick) {
-                        println("finishing ActionMode");
-                        return true;
-                    }
-//                    boolean enabled = getActionMenu().getItem(1).isEnabled();
-//                    if (cannotApplyHideOptionOn((CoverMessageItem) item)) {
-//                        return true;
-//                    }
-                }
-                return false;
-            });
-//            fastAdapter.withSelectWithItemUpdate(true);
-
-            fastAdapter.withOnClickListener((v, adapter, item, position) -> {
-                if (getActionMode() != null) {
-                    updateCab();
                     return true;
                 }
                 CoverMessageItem coverMessageItem = (CoverMessageItem) item;
 
-                ReplacedCoverMessage coverMessage = coverMessageItem.getCoverMessage();
-
+                ReplacedCoverMessage coverMessage = (ReplacedCoverMessage) coverMessageItem.getCoverMessage();
 
                 String originalSubject = coverMessage.getOriginal(CoverMessage.SUBJECT);
                 App.logTrace("subject = " + originalSubject);
@@ -129,57 +94,43 @@ public class FragmentPage extends Fragment {
                 String originalNewSubject = coverMessage.getOriginal(CoverMessage.NEW_SUBJECT);
                 App.logTrace("newSubject = " + originalNewSubject);
 
-                if (originalSubject.equals("")) {
-                    originalSubject = originalNewSubject;
-                }
-
                 if (!originalSubject.equals("") && !originalNewSubject.equals("") && !originalSubject.equals(originalNewSubject)) {
                     App.logTrace("Building OptionDialog");
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity()).setTitle("Welches Fach umbenennen?");
                     final CharSequence[] subjects = new CharSequence[]{coverMessage.get(CoverMessage.SUBJECT), coverMessage.get(CoverMessage.NEW_SUBJECT)};
-                    final CharSequence[] origSubjects = new CharSequence[]{originalSubject, originalNewSubject};
-
-                    new OptionDialogBuilder(getActivity(), subjects, origSubjects).getOptionDialog().show();
+                    builder.setSingleChoiceItems(subjects, -1, (dialog, which) -> {
+                        new FilterDialog(which == 0 ? originalSubject : originalNewSubject, subjects[which].toString(), getActivity(), this::resetPage).show();
+                        dialog.dismiss();
+                    });
+                    builder.show();
                 } else {
+                    final String concernedSubject;
+
+                    if (!originalSubject.equals("")) {
+                        concernedSubject = originalSubject;
+                    } else {
+                        if (originalNewSubject.equals("")) return false;
+                        concernedSubject = originalNewSubject;
+                    }
                     try {
-                        new FilterDialog(originalSubject, coverMessage.get(CoverMessage.SUBJECT), getActivity(), this::resetPage).show(); // FIXME: 25.03.2016 causes BadTokenException sometimes
+                        new FilterDialog(concernedSubject, coverMessage.get(CoverMessage.SUBJECT), getActivity(), this::resetPage).show(); // FIXME: 25.03.2016 causes BadTokenException sometimes
                     } catch (Exception e) {
                         App.logError("FilterDialog konnte nicht angezeigt werden");
-                        App.reportUnexpectedException(e);
+                        App.report(e);
                         e.printStackTrace();
                         Toast.makeText(getActivity(), "Ein unerwarteter Fehler ist aufgetreten. Aktualisiere und versuche es erneut", Toast.LENGTH_SHORT).show();
                     }
                 }
                 return true;
-            });
+            }, (MultiSelectHelper.OnClickView[]) null);
 
-            fastAdapter.withOnPreLongClickListener((v, adapter, item, position) -> actionModeHelper.onLongClick((AppCompatActivity) getActivity(), position) == null);
-
-            fastAdapter.withOnLongClickListener((v, adapter, item, position1) -> {
-                App.logUserInput("List-Item at position " + position1 + " was long-clicked");
-                updateCab();
-                return true;
-            });
         }
     }
 
-    private void updateCab() {
-        getActionMode().setTitle(String.valueOf(fastAdapter.getSelectedItems().size()));
-
-//        MenuItem hideOption = getActionMenu().getItem(1);
-//        if (item.isSelected() && cannotApplyHideOptionOn((CoverMessageItem) item)) {
-//            hideOption.setEnabled(false);
-//        } else if (!hideOption.isEnabled() && !item.isSelected() && cannotApplyHideOptionOn((CoverMessageItem) item)) {
-//            boolean containsInapplicableItems = false;
-//            for (IItem item1 : fastAdapter.getSelectedItems()) {
-//                println("item.getIdentifier() = " + item1.getIdentifier());
-//                if (cannotApplyHideOptionOn(((CoverMessageItem) item1))) {
-//                    containsInapplicableItems = true;
-//                    break;
-//                }
-//            }
-//            hideOption.setEnabled(!containsInapplicableItems);
-//        }
+    private void getMainActivity(App.WaitFor<MainActivity> waitFor) {
+        EventBus.getDefault().post(new Event.WaitForMainActivity(waitFor));
     }
+
 
     @Override
     public void onDestroy() {
@@ -216,6 +167,11 @@ public class FragmentPage extends Fragment {
             });
             recyclerView.setAdapter(fastAdapter);
 //            initialized++;
+
+            if (pendingError != null) {
+                showError(pendingError);
+                pendingError = null;
+            }
         }
 
         return view;
@@ -247,23 +203,7 @@ public class FragmentPage extends Fragment {
 //            println("Request Permission");
 //            EventBus.getDefault().post(new Event.LoadPermissionRequest(position));
 //        }
-        if (getActivity() == null) {
-            onAttach = activity -> EventBus.getDefault().post(new Event.LoadPermissionRequest(position));
-        } else {
-            onAttach = null;
-            EventBus.getDefault().post(new Event.LoadPermissionRequest(position));
-        }
-
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        System.out.println("FragmentPage.onAttach");
-        super.onAttach(context);
-        if (onAttach != null) {
-            onAttach.onResult((Activity) context);
-            onAttach = null;
-        }
+        EventBus.getDefault().post(new Event.LoadPermissionRequest(position));
     }
 
     private void println(String s) {
@@ -278,57 +218,63 @@ public class FragmentPage extends Fragment {
         }
         println("FragmentPage.onLoadPermitted");
 
-//        if (!isInitializedAndAttached()) { // TODO: 16.12.2016 check if working as intended
-//            println("Not initialized");
-//            waitingForInit = loadPermission;
-//            return;
-//        }
-
         if (loadingOrLoaded) {
             println("ALREADY LOADING OR ALREADY LOADED");
             return;
         }
-//        if (!noData) {
-            println("Starting download");
-//            noData = false;
-            fastAdapter.set(loadingHeaderAsList());
-            loadingOrLoaded = true;
-            new HbgDataDownload(App.getSelectedClass(getContext()), weekNumber, new DownloadHandler(getContext(), progressBar)).executeAsync(new ResultCallback<SortedCoverMessages>() {
-                @Override
-                public void onResult(SortedCoverMessages sortedCoverMessages) {
-                    setRefreshing(false); // TODO: 18.12.2016 activity is still null sometimes
+
+        println("Starting download");
+        fastAdapter.set(loadingHeaderAsList());
+        loadingOrLoaded = true;
+        ACRA.getErrorReporter().putCustomData("Week", String.valueOf(weekNumber));
+        FirebaseCrash.log("Loading week " + weekNumber);
+        new HbgDataDownload(App.getSelectedClass(getContext()), weekNumber, new DownloadHandler(getContext(), progressBar)).executeAsync(new ResultCallback<SortedCoverMessages>() {
+            @Override
+            public void onResult(SortedCoverMessages sortedCoverMessages) {
+                try {
+                    setRefreshing(false);
                     if (sortedCoverMessages == null) {
                         fastAdapter.set(noDataHeaderAsList());
-//                        noData = true;
                     } else {
-                        resetRecyclerView(sortedCoverMessages);
                         mSortedCoverMessages = sortedCoverMessages;
+                        resetPage();
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    App.report(e);
+                    loadingOrLoaded = false;
+                    onLoadPermitted(loadPermission);
                 }
+            }
 
-                @Override
-                public void onError(Throwable t) {
+            @Override
+            public void onError(Throwable t) {
 //                if (t instanceof FileNotFoundException) {
 //                      //no data for this week
 //                }
+                try {
                     setRefreshing(false);
                     println("Error: " + t.getMessage());
                     showError(t);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    App.report(e);
+                    loadingOrLoaded = false;
+                    showError(new Exception("Unbekannter Fehler", e));
                 }
-            });
-//        }
-
+            }
+        });
     }
 
-//    private boolean isInitializedAndAttached() {
-//        return initialized == 2;
-//    }
-
     private void showError(Throwable t) {
-        progressBar.setProgress(100);
-        errorView.setVisibility(View.VISIBLE);
-        recyclerView.setVisibility(View.GONE);
-        errorView.setSubtitle(t.getMessage());
+        if (view != null) {
+            progressBar.setProgress(100);
+            errorView.setVisibility(View.VISIBLE);
+            recyclerView.setVisibility(View.GONE);
+            errorView.setSubtitle(t.getMessage());
+        } else {
+            pendingError = t;
+        }
     }
 
 
@@ -357,43 +303,27 @@ public class FragmentPage extends Fragment {
         if (mSortedCoverMessages == null) {
             return;
         }
-//        println("FragmentPage.resetPage, position : " + position);
-//        int index = recyclerView.getFirstVisiblePosition();
-//        View v = recyclerView.getChildAt(0);
-//        int top = (v == null) ? 0 : (v.getTop() - recyclerView.getPaddingTop());
 
-        resetRecyclerView(mSortedCoverMessages);
+        getMainActivity(mainActivity -> {
+            SortedCoverMessages sortedCoverMessages = new SortedCoverMessages(mSortedCoverMessages, App.getCoverMessageFilter(mainActivity), App.getReplacer(mainActivity));
+            ArrayList<HBGMessage> messages = sortedCoverMessages.getListItems();
 
-
-//        recyclerView.setSelectionFromTop(index, top);
-
-    }
-
-    public void resetRecyclerView(SortedCoverMessages sortedCoverMessages) {
-        fastAdapter.set(toRecyclerViewItems(sortedCoverMessages));
-    }
-
-    private List<IItem> toRecyclerViewItems(SortedCoverMessages sortedCoverMessages) {
-        ArrayList<HBGMessage> messages = sortedCoverMessages.getListItems(App.getCoverMessageFilter(getContext()), App.getReplacer(getContext()));
-        if (messages.size() == 0) {
-            messages.add(new HeaderMessage("Keine Vertretungsdaten"));
-        }
-
-        List<IItem> items = new ArrayList<>(messages.size());
-        for (int i = 0; i < messages.size(); i++) {
-            HBGMessage message = messages.get(i);
-//            System.out.print("i = " + i);
-            if (message instanceof CoverMessage) {
-//                println(" ,  CoverMessage");
-                ReplacedCoverMessage coverMessage = (ReplacedCoverMessage) message;
-                items.add(new CoverMessageItem(coverMessage).withIdentifier(i));
-            } else if (message instanceof HeaderMessage) {
-//                println(" ,  HeaderMessage");
-                items.add(new DateHeaderItem((HeaderMessage) message).withIdentifier(i));
+            if (messages.size() == 0) {
+                messages.add(new HeaderMessage("Keine Vertretungsdaten"));
             }
-        }
 
-        return items;
+            List<IItem> items = new ArrayList<>(messages.size());
+            for (int i = 0; i < messages.size(); i++) {
+                HBGMessage message = messages.get(i);
+                if (message instanceof CoverMessage) {
+                    items.add(new CoverMessageItem((CoverMessage) message).withIdentifier(i));
+                } else if (message instanceof HeaderMessage) {
+                    items.add(new DateHeaderItem((HeaderMessage) message).withIdentifier(i));
+                }
+            }
+
+            fastAdapter.set(items);
+        });
     }
 
     private static boolean canScrollUp(RecyclerView recyclerView) {
@@ -408,7 +338,7 @@ public class FragmentPage extends Fragment {
     }
 
     private void setRefreshing(final boolean refreshing) {
-        getActivity().runOnUiThread(() -> ((MainActivity) getActivity()).waitForSwipeRefreshLayout(swipeRefreshLayout -> swipeRefreshLayout.setRefreshing(refreshing)));
+        EventBus.getDefault().post(new Event.RefreshStatus(refreshing));
     }
 
 //    @Override
@@ -436,7 +366,7 @@ public class FragmentPage extends Fragment {
     }
 
     public ActionMode getActionMode() {
-        return actionModeHelper != null ? actionModeHelper.getActionMode() : null;
+        return multiSelectHelper != null ? multiSelectHelper.getActionMode() : null;
     }
 
 //    public void setActionMenu(Menu actionMenu) {
@@ -505,7 +435,6 @@ public class FragmentPage extends Fragment {
 
         @Override
         public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-//            setActionMenu(menu);
             menu.getItem(1).setVisible(!Whitelist.isWhitelistModeActive(FragmentPage.this.getContext()));
             return true;
         }
@@ -514,71 +443,48 @@ public class FragmentPage extends Fragment {
         public boolean onActionItemClicked(final ActionMode mode, MenuItem item) {
             switch (item.getItemId()) {
                 case R.id.item_delete:
-//                    final boolean whitelistModeActive = Whitelist.isWhitelistModeActive(getActivity());
-                    App.dialog("Bestätigen", "Sollen Meldungen zu den ausgewählten Fächern nicht mehr angezeigt werden?"/* + (whitelistModeActive ? "\n\nAchtung, der Whitelist-Modus ist aktiv!" : "")*/, getActivity())
-                            .setPositiveButton("Ja", (dialog, which) -> {
-                                println("Not showing following subjects anymore:");
+                    App.dialog("Bestätigen", "Sollen Meldungen zu den ausgewählten Fächern nicht mehr angezeigt werden?", getActivity())
+                            .setPositiveButton("Ja", (dialog1, which1) -> {
 
-//                                final Whitelist whiteList;
-//                                whiteList = Whitelist.get(getContext());
                                 final Blacklist blacklist = Blacklist.get(getContext());
 
                                 for (IItem item1 : fastAdapter.getSelectedItems()) {
-                                    ReplacedCoverMessage coverMessage = ((CoverMessageItem) item1).getCoverMessage();
+                                    ReplacedCoverMessage coverMessage = (ReplacedCoverMessage) ((CoverMessageItem) item1).getCoverMessage();
 
                                     String subject = coverMessage.getOriginal(CoverMessage.SUBJECT);
-                                    println("subject = " + subject);
-
                                     String newSubject = coverMessage.getOriginal(CoverMessage.NEW_SUBJECT);
-                                    println("newSubject = " + newSubject);
-
-
 
                                     if (subject.equals("") && newSubject.equals("")) {
                                         App.dialog("Kein Fach enthalten", "In \"" + coverMessage.toString() + "\" ist kein Fach enthalten, das nicht mehr angezeigt werden könnte.", getActivity()).show();
-                                        continue;
                                     } else if (!subject.equals("") && !newSubject.equals("") && !subject.equals(newSubject) &&
-                                            !(blacklist.contains(coverMessage.get(CoverMessage.SUBJECT)) || blacklist.contains(coverMessage.get(CoverMessage.NEW_SUBJECT)))) {
+                                            !(blacklist.contains(subject) || blacklist.contains(newSubject))) {
 
-                                        App.dialog("Mehrere Fächer enthalten", "In \"" + coverMessage.toString() + "\" sind zwei Fächer enthalten.\n\nMeldungen zu beiden nicht mehr anzeigen?\nWähle \"nein\", um nur eins auszuwählen.", getActivity())
+                                        App.dialog("Mehrere Fächer enthalten", "In \"" + coverMessage.toString() + "\" sind zwei Fächer enthalten.\n\n" +
+                                                "Zu beiden keine Meldungen mehr anzeigen?\nWähle \"nein\", um nur ein Fach auszuwählen.", getActivity())
                                                 .setPositiveButton("Ja", (dialogInterface, i) -> {
                                                     blacklist.add(subject);
                                                     blacklist.add(newSubject);
                                                     blacklist.save();
                                                     resetPage();
                                                 })
-                                                .setNeutralButton("Überspringen", null)
                                                 .setNegativeButton("Nein", (dialogInterface, i) -> {
-                                                    AlertDialog optionDialog = new OptionDialogBuilder(getActivity(), new CharSequence[]{coverMessage.get(CoverMessage.SUBJECT), coverMessage.get(CoverMessage.NEW_SUBJECT)},
-                                                            new CharSequence[]{subject, newSubject}).getOptionDialog();
-                                                    optionDialog.setTitle("Welches nicht mehr anzeigen?");
-                                                    optionDialog.show();
+                                                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity()).setTitle("Welches nicht mehr anzeigen?");
+
+                                                    builder.setSingleChoiceItems(new CharSequence[]{coverMessage.get(CoverMessage.SUBJECT), coverMessage.get(CoverMessage.NEW_SUBJECT)}, -1, (dialog, which) -> {
+                                                        blacklist.add(which == 0 ? subject : newSubject);
+                                                        blacklist.save();
+                                                        resetPage();
+                                                        dialog.dismiss();
+                                                    });
+                                                    builder.show();
                                                 })
+                                                .setNeutralButton("Überspringen", null)
                                                 .show();
-
-                                        continue;
+                                    } else {
+                                        blacklist.add(!subject.equals("") ? subject : newSubject);
                                     }
-
-
-
-//                                    if (whitelistModeActive) {
-//                                        for (int j = 0; j < whiteList.size(); j++) {
-//                                            String whitelistedSubject = whiteList.get(j);
-//                                            println("whitelistedSubject = " + whitelistedSubject);
-//                                            if (whitelistedSubject.equals(originalSubject)) {
-//                                                whiteList.remove(j);
-//                                                break;
-//                                            }
-//                                        }
-//                                    } else {
-//                                    }
-                                    blacklist.add(!subject.equals("") ? subject : newSubject);
                                 }
 
-//                                if (whitelistModeActive) {
-//                                    whiteList.save();
-//                                } else {
-//                                }
                                 blacklist.save();
 
                                 resetPage();
@@ -591,10 +497,12 @@ public class FragmentPage extends Fragment {
                     StringBuilder sb = new StringBuilder();
                     SortedCoverMessages sortedCoverMessages = new SortedCoverMessages(fastAdapter.getSelectedItems().size());
                     for (IItem item2 : fastAdapter.getSelectedItems()) {
-                        CoverMessage coverMessage = ((CoverMessageItem) item2).getCoverMessage();
+                        ReplacedCoverMessage coverMessage = (ReplacedCoverMessage) ((CoverMessageItem) item2).getCoverMessage();
+                        coverMessage.setReplaced(CoverMessage.SUBJECT, null);
+                        coverMessage.setReplaced(CoverMessage.NEW_SUBJECT, null);
                         sortedCoverMessages.insert(coverMessage);
                     }
-                    ArrayList<HBGMessage> listItems = sortedCoverMessages.getListItems(null, null);
+                    ArrayList<HBGMessage> listItems = sortedCoverMessages.getListItems();
                     String bullet = " \u2022 ";
                     for (HBGMessage message : listItems) {
                         if (message instanceof CoverMessage) {
@@ -627,7 +535,6 @@ public class FragmentPage extends Fragment {
 
         @Override
         public void onDestroyActionMode(ActionMode mode) {
-//            setActionMenu(null);
         }
 
     }

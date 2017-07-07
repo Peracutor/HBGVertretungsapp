@@ -4,12 +4,9 @@ import android.content.Context;
 
 import com.eissler.micha.hbgvertretungsapp.App;
 
-import org.acra.ACRA;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 
 /**
  * Created by Micha.
@@ -44,14 +41,12 @@ public abstract class SavedList extends ArrayList<String> {
     }
 
     public boolean save() {
-        if (contains(null)) removeAll(Collections.singleton(null)); // TODO: 21.12.2016 find better solution than setting null to remove (iterator)
-
         try {
             App.writeObject(new ArrayList<>(this), fileName, context);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
-            ACRA.getErrorReporter().handleSilentException(e);
+            App.report(e);
             return false;
         }
     }

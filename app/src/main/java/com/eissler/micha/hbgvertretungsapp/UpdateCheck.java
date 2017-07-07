@@ -2,21 +2,18 @@ package com.eissler.micha.hbgvertretungsapp;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.support.v7.app.AlertDialog;
 
 import com.eissler.micha.hbgvertretungsapp.fcm.AppEngine;
 import com.eissler.micha.hbgvertretungsapp.settings.SettingsActivity;
+import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.eissler.micha.hbgvertretungsapp.util.Preferences;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.peracutor.hbgbackend.registration.Registration;
 import com.peracutor.hbgbackend.registration.model.VersionInfo;
-import com.peracutor.hbgserverapi.DownloadException;
 
 import java.io.IOException;
 import java.util.Date;
@@ -32,9 +29,7 @@ public class UpdateCheck {
 
     public UpdateCheck(final Activity activity) {
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
-        }
+        App.lockOrientation(activity);
         this.activity = activity;
 
         isSettingsActivity = activity instanceof SettingsActivity;
@@ -48,12 +43,9 @@ public class UpdateCheck {
             progressDialog.setMessage("Suche nach Updates...");
             progressDialog.setIndeterminate(true);
             progressDialog.setCancelable(true);
-            progressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override
-                public void onCancel(DialogInterface dialog) {
-                    interrupted = true;
-                    updatePoll.cancel(true);
-                }
+            progressDialog.setOnCancelListener(dialog -> {
+                interrupted = true;
+                updatePoll.cancel(true);
             });
             progressDialog.show();
             this.progressDialog = progressDialog;
@@ -110,6 +102,8 @@ public class UpdateCheck {
             System.out.println("newVersion = " + newVersion);
             if (thisVersion >= newVersion) {
                 System.out.println("App is the newest version.");
+                Preferences sharedPreferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, activity);
+                sharedPreferences.edit().putLong(Preferences.Key.LAST_UPDATE_CHECK, new Date().getTime()).apply();
                 if (isSettingsActivity) showDialog(App.dialog("Kein Update verfügbar", "Es ist die neueste Version der App installiert", activity));
                 return;
             }
@@ -120,23 +114,19 @@ public class UpdateCheck {
             if (installApk.getVersion() == result.getVersionNumber() && installApk.exists()) {
                 showDialog(UpdateTask.getReadyForInstallationBuilder(activity, installApk));
                 return;
+            } else if (installApk.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                installApk.delete();
             }
             //else
             if (!interrupted) {
                 AlertDialog.Builder dialog = App.dialog("Update verfügbar", new StringBuilder("Es steht ein Update zu Version ").append(result.getVersionName()).append(" zum Download bereit.\n\n")
                         .append(result.getVersionDescription()), activity)
-                        .setPositiveButton("Herunterladen", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                new UpdateTask(result.getVersionNumber(), result.getApkUrl(), activity);
-                            }
-                        }).setNegativeButton("Später", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (!isSettingsActivity) {
-                                    App.dialog("Update später installieren", "Um das Update später zu installieren, wähle Einstellungen --> Nach Updates suchen", activity)
-                                            .show();
-                                }
+                        .setPositiveButton("Herunterladen", (dialog1, which) -> new UpdateTask(result.getVersionNumber(), result.getApkUrl(), activity))
+                        .setNegativeButton("Später", (dialog12, which) -> {
+                            if (!isSettingsActivity) {
+                                App.dialog("Update später installieren", "Um das Update später zu installieren, wähle Einstellungen --> Nach Updates suchen", activity)
+                                        .show();
                             }
                         });
                 showDialog(dialog);
@@ -157,17 +147,12 @@ public class UpdateCheck {
             progressDialog.dismiss();
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+        App.unlockOrientation(activity);
 
 
         if (((activity instanceof MainActivity) && !MainActivity.mainActivityPaused) || (isSettingsActivity && !SettingsActivity.settingsActivityPaused)) {
 
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    builder.show();
-                }
-            });
+            activity.runOnUiThread(builder::show);
 
             if (successful) {
                 Preferences sharedPreferences = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, activity);

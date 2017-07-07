@@ -1,26 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<ScrollView
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:card="http://schemas.android.com/apk/res-auto"
-    android:paddingBottom="@dimen/activity_vertical_margin"
-    android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context="com.eissler.micha.hbgvertretungsapp.fcm.NotificationViewActivity">
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <it.gmariotti.cardslib.library.view.CardViewNative
-        android:id="@+id/notification_image_card"
+    <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        card:card_layout_resourceID="@layout/native_material_largeimage_text_card"
-        android:visibility="gone"/>
+        android:paddingBottom="@dimen/activity_vertical_margin"
+        android:paddingLeft="@dimen/activity_horizontal_margin"
+        android:paddingRight="@dimen/activity_horizontal_margin"
+        android:paddingTop="@dimen/activity_vertical_margin"
+        tools:context="com.eissler.micha.hbgvertretungsapp.fcm.NotificationViewActivity">
 
-    <it.gmariotti.cardslib.library.view.CardViewNative
-        android:id="@+id/notification_card"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"/>
+        <!--<it.gmariotti.cardslib.library.view.CardViewNative
+            android:id="@+id/notification_image_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            card:card_layout_resourceID="@layout/native_material_largeimage_text_card"
+            android:visibility="gone"/>
 
-</RelativeLayout>
+        <it.gmariotti.cardslib.library.view.CardViewNative
+            android:id="@+id/notification_card"
+            android:layout_margin="5dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"/>-->
+
+        <android.support.v7.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            >
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                >
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/image_view"
+                    android:layout_gravity="center_horizontal"
+                    android:scaleType="fitCenter"
+                    android:adjustViewBounds="true"
+                    />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/text_view_title"
+                    android:textStyle="bold"
+                    android:textSize="24sp"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginRight="16dp"
+                    />
+
+                <TextView
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="24dp"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginRight="16dp"
+                    android:textSize="16sp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/text_view_body"
+                    android:autoLink="web|email"
+
+                    />
+            </LinearLayout>
+        </android.support.v7.widget.CardView>
+
+    </RelativeLayout>
+
+
+</ScrollView>

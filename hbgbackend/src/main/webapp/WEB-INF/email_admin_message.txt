@@ -1,0 +1,13 @@
+Eine neue Nachricht wurde eingereicht:
+
+    %1$s
+
+    %2$s
+
+    %4$s
+
+Zum Senden hier klicken:
+http://hbg-vertretungsapp.appspot.com/confirm_notification?key=%3$s
+
+Zum Löschen hier klicken:
+http://hbg-vertretungsapp.appspot.com/confirm_notification?key=%3$s&delete=true

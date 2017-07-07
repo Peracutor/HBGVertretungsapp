@@ -6,8 +6,8 @@ package com.peracutor.hbgserverapi;
  */
 
 public class ReplacedCoverMessage extends CoverMessage {
-    private String replacedSubject;
-    private String replacedNewSubject;
+
+    private String[] replacedFields = new String[8];
 
 //    public ReplacedCoverMessage(Builder coverMessageBuilder) {
 //        super(coverMessageBuilder);
@@ -18,24 +18,22 @@ public class ReplacedCoverMessage extends CoverMessage {
     }
 
     @Override
-    public String get(int index) {
-        if (index == SUBJECT && replacedSubject != null) {
-            return replacedSubject;
-        } else if (index == NEW_SUBJECT && replacedNewSubject != null) {
-            return replacedNewSubject;
+    public String get(int field) {
+        if (replacedFields[field] != null) {
+            return replacedFields[field];
         }
-        return super.get(index);
+        return super.get(field);
     }
 
     public String getOriginal(int index) {
         return super.get(index);
     }
 
-    public void setReplacedSubject(String replacedSubject) {
-        this.replacedSubject = replacedSubject;
+    public void setReplaced(int field, String value) {
+        replacedFields[field] = value;
     }
 
-    public void setReplacedNewSubject(String replacedNewSubject) {
-        this.replacedNewSubject = replacedNewSubject;
-    }
+//    protected String[] getReplacedFields() {
+//        return replacedFields;
+//    }
 }

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="auto_name_pattern_list">
+        <item>*f</item>
+        <item>*f *k*n</item>
+        <item>*n.*k *f</item>
+        <item>*k *f (*n)</item>
+        <item>*f (*k*n)</item>
+    </string-array>
+    <string-array name="auto_name_pattern_entry_list">
+        <item>Erdkunde</item>
+        <item>Erdkunde LK2</item>
+        <item>2.LK Erdkunde</item>
+        <item>LK Erdkunde (2)</item>
+        <item>Benutzerdefiniert</item>
+    </string-array>
+
+    <string-array name="filter_mode_values">
+        <item>blacklist</item>
+        <item>whitelist</item>
+    </string-array>
+    <string-array name="filter_mode_entries">
+        <item>Fächer einzeln verstecken</item>
+        <item>Meine Fächer einspeichern</item>
+    </string-array>
+
+    <string-array name="notification_light_color_values" >
+        <item>-65536</item>
+        <item>-1</item>
+        <item>-256</item>
+        <item>-16711936</item>
+        <item>-16711681</item>
+        <item>-16776961</item>
+        <item>-65281</item>
+    </string-array>
+    <string-array name="notification_light_color_entries">
+        <item>Rot</item>
+        <item>Weiß</item>
+        <item>Gelb</item>
+        <item>Grün</item>
+        <item>Cyan</item>
+        <item>Blau</item>
+        <item>Lila</item>
+    </string-array>
+</resources>

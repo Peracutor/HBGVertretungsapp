@@ -1,9 +1,10 @@
 package com.peracutor.hbgserverapi;
 
+
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -28,15 +29,10 @@ public class HbgAsOfDateDownload extends HbgDownload<Date> {
 
 
     @Override
-    protected Date evaluate(String htmlText) {
+    protected Date evaluate(String htmlText) throws Exception {
         Document document = Jsoup.parse(htmlText);
         String infoText = document.select("table").select("tr").select("td").get(1).select("table").select("tr").select("td").select("span").get(2).text();
         String asOfDateString = infoText.substring(infoText.indexOf(AS_OF_STRING) + AS_OF_STRING.length());
-        try {
-            return new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY).parse(asOfDateString);
-        } catch (ParseException e) {
-            e.printStackTrace();
-            return null;
-        }
+        return new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY).parse(asOfDateString);
     }
 }

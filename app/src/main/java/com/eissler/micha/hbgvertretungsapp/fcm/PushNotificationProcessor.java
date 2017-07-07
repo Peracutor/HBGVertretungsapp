@@ -1,22 +1,13 @@
 package com.eissler.micha.hbgvertretungsapp.fcm;
 
 import android.app.AlarmManager;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.support.v4.app.NotificationCompat;
 
+import com.eissler.micha.cloudmessaginglibrary.InfoNotification;
 import com.eissler.micha.hbgvertretungsapp.App;
-import com.eissler.micha.hbgvertretungsapp.MainActivity;
-import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
-import com.eissler.micha.hbgvertretungsapp.RequestCodes;
 import com.eissler.micha.hbgvertretungsapp.TestPushRequestProcessor;
+import com.eissler.micha.hbgvertretungsapp.util.ProcessorDistributor;
 import com.google.firebase.messaging.RemoteMessage;
-import com.koushikdutta.ion.Ion;
-
-import java.util.Map;
 
 /**
  * Created by Micha.
@@ -26,69 +17,16 @@ public class PushNotificationProcessor extends ProcessorDistributor.Processor<Re
 
     @Override
     public String getAction() {
-        return "InfoNotification";
+        return InfoNotification.ACTION;
     }
 
-    //dxO56uR8LnI:APA91bFoNTqszNmSuWe_DL62tcnEz-b4Z7bcVKx9MdK6BmlOnj5XKpGaR0P4S3HBjQonlnrKcRTD5rXXqQUav9kYLT6p3jpSSVcBmYuvxh0YxS5fZ9sARJY1_UWRjUnlJL5o7zZb0nI_
     @Override
     public void process(RemoteMessage remoteMessage) {
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(TestPushRequestProcessor.getFailedPendingIntent(getContext()));
 
-        System.out.println("PushNotificationProcessor.process");
-        Map<String, String> data = remoteMessage.getData();
-        for (Map.Entry<String, String> entry : data.entrySet()) {
-            data.put(entry.getKey(), replaceUmlaute(entry.getValue()));
-        }
-
-        final String title = data.get("title");
-        final String body = data.get("body");
-        String imageUrl = data.get("imageUrl");
-
-        System.out.println("title = " + title);
-        System.out.println("body = " + body);
-
-
-        Intent backIntent = new Intent(getContext(), MainActivity.class);
-        backIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        Intent intent = new Intent(getContext(), NotificationViewActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra("title", title)
-                .putExtra("body", body)
-                .putExtra("imageUrl", imageUrl);
-        PendingIntent pendingIntent = PendingIntent.getActivities(getContext(), RequestCodes.ACTIVITY_OPEN_NOTIFICATION, new Intent[]{backIntent, intent}, PendingIntent.FLAG_UPDATE_CURRENT);
-
-        final NotificationCompat.Builder notificationBuilder = App.getNotificationBuilder(getContext())
-                .setContentTitle(title)
-                .setContentText(body)
-                .setContentIntent(pendingIntent);
-
-        final NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-
-        if (imageUrl != null) try {
-            Bitmap bitmap = Ion.with(getContext())
-                    .load(imageUrl)
-                    .asBitmap()
-                    .get();
-
-            System.out.println("Image downloaded");
-
-            notificationBuilder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(bitmap).setSummaryText(body));
-            notificationManager.notify(RequestCodes.NOTIFICATION_PUSH, notificationBuilder.build());
-            return;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        notificationBuilder.setStyle(new NotificationCompat.BigTextStyle().bigText(body));
-        notificationManager.notify(RequestCodes.ALARM_REQUEST_TEST_PUSH, notificationBuilder.build());
-    }
-
-    private static String replaceUmlaute(String s) {
-        return s.replace("ae", "ä").replace("ue", "ü").replace("oe", "ö")
-                .replace("Ae", "Ä").replace("Ue", "Ü").replace("Oe", "Ö")
-                .replace("s_z", "ß");
+        InfoNotification notification = new InfoNotification(remoteMessage.getData());
+        App.showNotification(notification, getContext());
     }
 
 

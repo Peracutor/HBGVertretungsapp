@@ -20,8 +20,6 @@
         android:layout_height="match_parent"
         android:id="@+id/recyclerView"
         android:layout_below="@id/progress"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="1dp"
         />
 
     <tr.xip.errorview.ErrorView

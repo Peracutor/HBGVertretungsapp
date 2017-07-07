@@ -20,7 +20,6 @@ import com.google.firebase.iid.FirebaseInstanceIdService;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.peracutor.hbgbackend.registration.Registration;
 
-import org.acra.ACRA;
 import org.acra.util.Installation;
 
 import java.io.IOException;
@@ -77,7 +76,7 @@ public class InstanceIdListenerService extends FirebaseInstanceIdService {
         if (backoff.retry()) {
             alarmManager.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + backoff.getValue(), pendingIntent);
         } else {
-            ACRA.getErrorReporter().handleSilentException(new Exception("Failed to send registration token after 8 tries"));
+            App.report(new Exception("Failed to register after 8 tries"));
         }
 
     }

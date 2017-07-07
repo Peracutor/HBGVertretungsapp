@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">HBG Vertretungsapp</string>
+    <string name="app_name">HBG Vertretungsplan</string>
 
     <string name="action_settings">Einstellungen</string>
     <string name="defaultText">Lade…</string>
@@ -10,38 +10,33 @@
     <string name="show_notifications">Benachrichtigungen</string>
     <string name="notification_time_1">1. Benachrichtigungszeit</string>
     <string name="notification_time_2">2. Benachrichtigungszeit</string>
-    <string name="title_activity_custom_names_list">Anzeigenamen der Fächer</string>
+    <string name="title_activity_custom_names_list">Anzeigenamen</string>
     <string name="title_activity_hidden_subjects">Versteckte Fächer</string>
-    <string name="title_activity_whitelist_subjects">Whitelist-Fächer</string>
+    <string name="title_activity_whitelist_subjects">Meine Fächer</string>
+    <string name="title_activity_notification_settings">Benachrichtigungen</string>
+    <string name="title_activity_notificationview">Nachricht</string>
 
 
     <string name="hourText">Stunde</string>
     <string name="view_on_website">Zur Webseite wechseln</string>
-    <string name="title_activity_update">Update</string>
-    <string name="do_not_show">Nicht anzeigen</string>
+    <string name="do_not_show">Verstecken</string>
 
-    <string name="pref_acra_user_email">Deine E-Mail-Adresse</string>
-    <string name="pref_acra_user_email_summary">Dass ich dich kontaktieren kann, falls auf deinem Gerät ein Fehler auftritt.</string>
     <string name="mailto_me">Kontaktiere mich per E-Mail</string>
     <string name="contact_me_summary">Melde mir Fehler oder gib Feedback und Verbesserungsvorschläge</string>
-    <string name="add">Hinzufügen</string>
 
-    <string name="new_custom_name">Neuer Anzeigename des Faches:</string>
-    <string name="edit_text_label">Name des Faches, wie es auf der Webseite angezeigt wird:</string>
+    <string name="add">Hinzufügen</string>
+    <string name="hint_subject_abbr">Fachkürzel (wie am Vertretungsplan)</string>
+    <string name="hint_new_custom_name">Neuer Anzeigename</string>
     <string name="open">Klassenauswahl öffnen</string>
     <string name="close">Klassenauswahl schließen</string>
 
-    <string name="crash_text">Aufgrund eines Fehlers ist die App abgestürzt. Ein Fehlerbericht wird gesendet.</string>
+    <string name="crash_text">Ups, App ist abgestürzt. Ein Fehlerbericht wird gesendet.</string>
     <string name="delete">Entfernen</string>
     <string name="whitelist_label">Es werden ausschließlich Meldungen zu den folgenden Fächern angezeigt:</string>
     <string name="label_custom_names_list">Folgende Anzeigenamen sind für die Fächer gespeichert:</string>
-    <string name="display_name_website">Umzubenennendes Fach</string>
-    <string name="new_display_name">Neuer Anzeigename</string>
     <string name="label_hidden_subjects">Meldungen zu folgenden Fächern werden nicht angezeigt:</string>
 
-    <string name="error_image">ExclamationMarkImage</string>
     <string name="share">Teilen</string>
-    <string name="title_activity_notificationview">Nachricht</string>
 
     <string name="act_nv_download_image">Lade Bild herunter…</string>
 
@@ -56,21 +51,14 @@
     <string name="act_ma_refresh">Aktualisieren</string>
     <string name="global_error">Ups…</string>
     <string name="room_text">Raum</string>
-
-
-    <array name="auto_name_pattern_list">
-        <item>*f</item>
-        <item>*f *k*n</item>
-        <item>*k *f</item>
-        <item>*f (*k*n)</item>
-    </array>
-    <array name="auto_name_pattern_entry_list"> <!--todo mark as examples for the pattern-->
-        <item>Erdkunde</item>
-        <item>Erdkunde LK2</item>
-        <item>LK Erdkunde</item>
-        <item>Benutzerdefiniert</item>
-    </array>
-
-
-
+    <string name="custom_name_text">Anzeigename</string>
+    <string name="hint_custom_pattern">Anzeigemuster</string>
+    <string name="confirm">Bestätigen</string>
+    <string name="title_activity_app_intro">Einführung</string>
+    <string name="receiver">Empfänger</string>
+    <string name="title">Titel</string>
+    <string name="info_text">Text</string>
+    <string name="valid_end_date">Gültig bis (optional):</string>
+    <string name="title_activity_submit_notification">Benachrichtigung einreichen</string>
+    <string name="image_url">Bild-URL (optional)</string>
 </resources>

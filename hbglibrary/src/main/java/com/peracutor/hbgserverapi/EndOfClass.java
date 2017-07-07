@@ -15,7 +15,7 @@ public class EndOfClass {
 
     private static Date[] endOfClass;
 
-    public static Date get(int hour) {
+    public static Date get(int lesson) {
         if (endOfClass == null) try {
             endOfClass = new Date[]{SDF.parse("08:45"), SDF.parse("09:35"), SDF.parse("10:40"),
                     SDF.parse("11:35"), SDF.parse("12:30"), SDF.parse("13:25"), SDF.parse("14:40"),
@@ -27,6 +27,6 @@ public class EndOfClass {
             System.exit(1);
         }
 
-        return endOfClass[hour - 1];
+        return endOfClass[lesson - 1];
     }
 }

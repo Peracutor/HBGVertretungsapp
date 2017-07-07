@@ -33,7 +33,7 @@ public class HbgDataDownload extends HbgDownload<SortedCoverMessages> {
     }
 
     @Override
-    protected SortedCoverMessages evaluate(String htmlText) {
+    protected SortedCoverMessages evaluate(String htmlText) throws Exception {
         if (htmlText.contains("keine Vertretungsdaten")) {
             return null;
         }
@@ -85,9 +85,11 @@ public class HbgDataDownload extends HbgDownload<SortedCoverMessages> {
 
                 } else if (j == CoverMessage.KIND && nextField.contains(":")) {
                     messageBuilder.setField(j, nextField.substring(0, nextField.lastIndexOf(":")));
+                } else if (j == CoverMessage.KIND && nextField.matches("\\d+ [a-zA-ZÄÖÜäöüß.]+")) { //bug occurring on the hbg website from time to time
+                    messageBuilder.setField(j, nextField.split(" ")[1]);
                 } else if (j == CoverMessage.ROOM) {
                     messageBuilder.setField(j, nextField.replace("???", "R?"));
-                } else if (j == CoverMessage.HOUR && nextField.equals("")) {
+                } else if (j == CoverMessage.LESSON && nextField.equals("")) { // TODO: 07.07.2017 spawn spaces if they are not on the web-page
                     messageBuilder.setField(j, "?");
                 } else {
                     messageBuilder.setField(j, nextField);
@@ -98,94 +100,4 @@ public class HbgDataDownload extends HbgDownload<SortedCoverMessages> {
         }
         return messages;
     }
-
-    //    private ArrayList<String[]> sortList(ArrayList<String[]> unsortedList) {
-//        ArrayList<String[]> sortedList = new ArrayList<>(unsortedList.size());
-//        for (String[] dataSet : unsortedList) {
-//            boolean added = false;
-//            int concernedHour;
-//            if (!dataSet[HOUR].equals("")) {
-//                concernedHour = getBeginningHour(dataSet[HOUR]);
-//            } else {
-//                dataSet[HOUR] = "?";
-//                sortedList.add(dataSet);
-//                continue;
-//            }
-//            int size = sortedList.size();
-//
-//            for (int i = 0; i < size; i++) {
-//                int compareHour;
-//                if (!sortedList.get(i)[HOUR].equals("?")) {
-//                    compareHour = getBeginningHour(sortedList.get(i)[HOUR]);
-//                } else {
-//                    compareHour = 99;
-//                }
-//                if (compareHour > concernedHour) {
-//                    sortedList.add(i, dataSet);
-//                    added = true;
-//                    break;
-//                }
-//            }
-//            if (!added) {
-//                sortedList.add(dataSet);
-//            }
-//        }
-//        return sortedList;
-//    }
-
-//    private String retrieveStand() {
-//        String file;
-//        try {
-//            file = downloadUrl("http://vp.hbgym.de/frames/title.htm", "retrieving stand");
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            //returning null causes newDataAvailable()-function to return true
-//            return null;
-//        }
-//
-//
-//        int start = file.indexOf("Stand: ") + 7;
-//        int end = start + 16;
-//
-//        String dateString = file.substring(start, end);
-//        System.out.println("Stand der HBG-Website: " + dateString);
-//
-//
-//        prefs.edit().putString(LAST_TIME_STAND_RETRIEVED, PRECISE_SDF.format(new Date())).apply();
-//
-//        return dateString;
-//    }
-
-//    boolean minutesLater(int minutes) {
-//
-//        Calendar twoMinLater = Calendar.getInstance();
-//        twoMinLater.setTime(lastTimeStandRetrieved);
-//        twoMinLater.add(Calendar.MINUTE, minutes);
-//        Date twoMinutesLater = twoMinLater.getTime();
-//
-//        System.out.println("Two minutes later?: " + new Date().after(twoMinutesLater));
-//
-//        return new Date().after(twoMinutesLater);
-//    }
-//
-//    boolean newDataAvailable() {
-//        String dateString = retrieveStand();
-//        if (dateString == null) {
-//            return true;
-//        }
-//
-//        Date stand;
-//        try {
-//            stand = PRECISE_SDF.parse(dateString);
-//        } catch (ParseException e) {
-//            System.err.println("Error parsing stand");
-//            e.printStackTrace();
-//            return true;
-//        }
-//
-//        boolean newDataAvailable = stand.after(lastTimeStandRetrieved);
-//        System.out.println("New data available?: " + newDataAvailable);
-//        return newDataAvailable;
-//    }
-
 }

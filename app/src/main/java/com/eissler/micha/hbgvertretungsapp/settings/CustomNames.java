@@ -5,59 +5,54 @@ import android.content.Context;
 import com.eissler.micha.hbgvertretungsapp.App;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
-public class CustomNames extends HashMap<String, String> {
+public class CustomNames extends TreeMap<String, String> {
 
     public final static String CUSTOM_NAMES = "CustomNames";
     private Context context;
 
 
     public static CustomNames get(Context context) {
-        return new CustomNames(context);
-    }
-
-    public static CustomNames get(Context context, int capacity) {
-        return new CustomNames(context, capacity);
-    }
-
-    private CustomNames(Context context) {
-        this(context, 0);
-    }
-
-    private CustomNames(Context context, int capacity) {
-        super(capacity);
-        this.context = context;
-
-        HashMap<String, String> customNames;
+        TreeMap<String, String> customNames;
         try {
             customNames = App.retrieveObject(CUSTOM_NAMES, context);
         } catch (FileNotFoundException e) {
             App.logError("No CustomNames-file found.");
-            return;
-        } catch (ClassNotFoundException | IOException e) {
+            return new CustomNames(context, new TreeMap<>());
+        } catch (ClassCastException e) {
+            try {
+                Map<String, String> map = App.retrieveObject(CustomNames.CUSTOM_NAMES, context);
+                customNames = new TreeMap<>(map);
+            } catch (Exception e1) {
+                App.exitWithError(e1);
+                return new CustomNames(context, null);//just so AndroidStudio does not show "may cause NullPointerException"
+            }
+        } catch (Exception e) {
             App.exitWithError(e);
-            return;
+            return new CustomNames(context, null); //just so AndroidStudio does not show "may cause NullPointerException"
         }
+        return new CustomNames(context, customNames);
+    }
 
-        if (customNames != null) {
-            this.putAll(customNames);
-        }
+    private CustomNames(Context context, TreeMap<String, String> customNames) {
+        super(customNames);
+        this.context = context;
     }
 
 
     /**
      * Saves this CustomNames-Object to the internal storage.
      *
-     * @return true if saved successfully, false if not.
+     * @return true if saved successfully
      */
     public boolean save() {
         try {
-            App.writeObject(new HashMap<>(this), CUSTOM_NAMES, context);
+            App.writeObject(new TreeMap<>(this), CUSTOM_NAMES, context);
         } catch (Exception e) {
             App.logError("Error writing object customNames");
-            App.reportUnexpectedException(e);
+            App.report(e);
             e.printStackTrace();
             return false;
         }

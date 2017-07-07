@@ -2,9 +2,12 @@ package com.eissler.micha.hbgvertretungsapp;
 
 import android.app.Application;
 
+import com.google.firebase.crash.FirebaseCrash;
+
 import org.acra.ACRA;
 import org.acra.ReportingInteractionMode;
 import org.acra.annotation.ReportsCrashes;
+import org.acra.util.Installation;
 
 import java.util.TimeZone;
 
@@ -35,6 +38,14 @@ public class HbgApplication extends Application {
 //        Ion.getDefault(this).configure().setLogging("Ion", Log.INFO);
         // The following line triggers the initialization of ACRA
         ACRA.init(this);
+
+        App.installationId = Installation.id(this);
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            FirebaseCrash.log("FATAL ERROR");
+            App.firebaseReport(throwable);
+            App.acraLogFcmToken();
+            ACRA.getErrorReporter().uncaughtException(thread, throwable);
+        });
     }
 
     //    /**

@@ -45,16 +45,16 @@ public class AutoName {
 
             put("d", "Deutsch");
             put("m", "Mathe");
-            put("e", "Engisch");
+            put("e", "Englisch");
             put("l", "Latein");
             put("g", "Geschichte");
             put("f", "Französisch");
             put("eth", "Ethik");
             put("rel", "Religion");
+//            put("mus", "Musik"); // TODO: 14.01.2017 Mus = Musik?
             put("sp", "Sport");
             put("mchor", "Mädchenchor");
             put("sinf", "Sinfonietta");
-            // TODO: 15.12.2016 put("sowi", "Sozial-Wissensch.") ?
         }
     });
 
@@ -78,14 +78,14 @@ public class AutoName {
         String subjectAbbr;
         String classType;
         String classCount;
-        if (subject.matches("[GL][A-Za-z]{2}[NAÜ]\\d?")) { //Oberstufen-Kürzel
+        if (subject.matches("[GL][A-Za-zÄÖÜäöüß]{2}[NAÜ]\\d?")) { //Oberstufen-Kürzel
             subjectAbbr = subject.substring(1, 3);
             classType = subject.substring(0, 1) + "K";
             classCount = subject.substring(4);
 
-        } else if (subject.matches("S[A-Za-z]{3}\\d?")) { //Oberstufen-Sportkürzel
+        } else if (subject.matches("S[A-Za-zÄÖÜäöüß]{3}\\d?")) { //Oberstufen-Sportkürzel
             subjectAbbr = subject.substring(1, 4);
-            classType = ""; //S
+            classType = "SK";
             classCount = subject.substring(4);
         } else {
             subjectAbbr = subject;

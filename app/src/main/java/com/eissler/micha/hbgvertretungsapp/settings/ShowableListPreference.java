@@ -6,6 +6,7 @@ import android.content.Context;
 import android.os.Build;
 import android.preference.ListPreference;
 import android.util.AttributeSet;
+import android.widget.Toast;
 
 /**
  * Created by Micha.
@@ -39,6 +40,6 @@ public class ShowableListPreference extends ListPreference {
     @Override
     protected void onPrepareDialogBuilder(AlertDialog.Builder builder) {
         super.onPrepareDialogBuilder(builder);
-        builder.setTitle("Wie sollen Kürzel ausgeschrieben werden? (Bsp.: LEkN2)");
+        Toast.makeText(builder.getContext(), "Muster am Bsp. von \"LEkN2\"", Toast.LENGTH_LONG).show();
     }
 }

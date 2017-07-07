@@ -25,7 +25,7 @@ public class HbgAvailableWeeksDownload extends HbgDownload<ArrayList<Integer>> {
     }
 
     @Override
-    protected ArrayList<Integer> evaluate(String htmlText) {
+    protected ArrayList<Integer> evaluate(String htmlText) throws Exception {
         Elements options = Jsoup.parse(htmlText).select("select").get(0).select("option");
 
 
@@ -42,11 +42,12 @@ public class HbgAvailableWeeksDownload extends HbgDownload<ArrayList<Integer>> {
         for (Element weekOption : options) {
             int weekNumber = Integer.parseInt(weekOption.attributes().get("value"));
 
-            if (weekNumber < currentWeek) {
+            if (weekNumber < currentWeek && currentWeek - weekNumber < 30
+                    || weekNumber > currentWeek + 30) {
                 continue;
             } else if (weekNumber == currentWeek) {
                 boolean isWeekEnd = dayInWeek == Calendar.SATURDAY || dayInWeek == Calendar.SUNDAY;
-                if (isWeekEnd) {
+                if (isWeekEnd || dayInWeek == Calendar.FRIDAY && calendar.get(Calendar.HOUR_OF_DAY) >= 19) {
                     continue;
                 }
             }

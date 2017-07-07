@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item type="id" name="cover_message_item" />
-    <item type="id" name="simple_text_item" />
+    <item name="cover_message_item" type="id" />
+    <item name="simple_text_item" type="id" />
+    <item name="custom_name_item" type="id" />
 </resources>

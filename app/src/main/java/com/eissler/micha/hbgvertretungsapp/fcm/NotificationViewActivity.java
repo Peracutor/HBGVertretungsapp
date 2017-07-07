@@ -4,28 +4,33 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
-import android.widget.Toast;
+import android.widget.TextView;
 
 import com.eissler.micha.hbgvertretungsapp.R;
 import com.koushikdutta.ion.Ion;
 
-import it.gmariotti.cardslib.library.cards.material.MaterialLargeImageCard;
-import it.gmariotti.cardslib.library.internal.Card;
-import it.gmariotti.cardslib.library.internal.CardHeader;
-import it.gmariotti.cardslib.library.view.CardViewNative;
+import butterknife.BindView;
+import butterknife.ButterKnife;
 
 public class NotificationViewActivity extends AppCompatActivity {
 
-    CardViewNative cardViewNative;
+    @BindView(R.id.image_view)
+    ImageView imageView;
+
+    @BindView(R.id.text_view_title)
+    TextView tv_title;
+
+    @BindView(R.id.text_view_body)
+    TextView tv_body;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_notification_view);
+        ButterKnife.bind(this);
+        System.out.println("NotificationViewActivity.onCreate");
+
         //noinspection ConstantConditions
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
@@ -39,48 +44,34 @@ public class NotificationViewActivity extends AppCompatActivity {
         checkIntent(intent);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        System.out.println("NotificationViewActivity.onResume");
+    }
+
     private void checkIntent(Intent intent) {
+        System.out.println("NotificationViewActivity.checkIntent");
         Bundle data = intent.getExtras();
 
         final String title = data.getString("title");
         final String body = data.getString("body");
         final String imageUrl = data.getString("imageUrl");
 
+        tv_title.setText(title);
+        tv_body.setText(body);
+
         System.out.println("imageUrl = " + imageUrl);
-        if (imageUrl != null && !imageUrl.equals("")) {
-            cardViewNative = (CardViewNative) findViewById(R.id.notification_image_card);
-            cardViewNative.setVisibility(View.VISIBLE);
-
-            Toast.makeText(this, R.string.act_nv_download_image, Toast.LENGTH_SHORT).show();
-            MaterialLargeImageCard.SetupWizard cardBuilder = MaterialLargeImageCard.with(this)
-                    .setTitle(title)
-                    .setSubTitle(body)
-                    .useDrawableUrl(imageUrl)
-                    .useDrawableExternal(new MaterialLargeImageCard.DrawableExternal() {
-                        @Override
-                        public void setupInnerViewElements(ViewGroup parent, View viewImage) {
-                            Animation animation = AnimationUtils.loadAnimation(NotificationViewActivity.this, R.anim.anim_refresh);
-                            animation.setRepeatCount(Animation.INFINITE);
-                            Ion.with(NotificationViewActivity.this)
-                                    .load(imageUrl)
-                                    .withBitmap()
-                                    .placeholder(R.drawable.ic_refresh_black_48dp)
-                                    .error(R.drawable.ic_error_black_24dp)
-                                    .animateLoad(animation)
-                                    .intoImageView((ImageView) viewImage);
-                        }
-                    });
-            cardViewNative.setCard(cardBuilder.build());
+        if (imageUrl == null || imageUrl.equals("")) {
+            imageView.setVisibility(View.GONE);
         } else {
-            cardViewNative = (CardViewNative) findViewById(R.id.notification_card);
-            cardViewNative.setVisibility(View.VISIBLE);
-            Card card = new Card(this);
-            CardHeader header = new CardHeader(this);
-            header.setTitle(title);
-            card.addCardHeader(header);
-            card.setTitle(body);
-            cardViewNative.setCard(card);
+            imageView.setVisibility(View.VISIBLE);
+            Ion.with(NotificationViewActivity.this)
+                    .load(imageUrl)
+                    .withBitmap()
+                    .placeholder(R.drawable.ic_image_black_48dp)
+                    .error(R.drawable.ic_error_black_48dp)
+                    .intoImageView(imageView);
         }
-
     }
 }
