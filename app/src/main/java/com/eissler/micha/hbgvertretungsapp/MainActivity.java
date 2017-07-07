@@ -39,6 +39,7 @@ import com.eissler.micha.hbgvertretungsapp.settings.Whitelist;
 import com.eissler.micha.hbgvertretungsapp.settings.WhitelistSubjects;
 import com.eissler.micha.hbgvertretungsapp.util.DownloadException;
 import com.eissler.micha.hbgvertretungsapp.util.Preferences;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.crash.FirebaseCrash;
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.peracutor.hbgserverapi.HbgAsOfDateDownload;
@@ -113,7 +114,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         EventBus.getDefault().register(this);
         StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().permitAll().build());
 
-//        FirebaseAnalytics.getInstance(this).setAnalyticsCollectionEnabled(false); // TODO: 23.03.2017 REMOVE
+        FirebaseAnalytics.getInstance(this).setAnalyticsCollectionEnabled(false); // TODO: 23.03.2017 REMOVE
         prefs = Preferences.getPreference(Preferences.Preference.MAIN_PREFERENCE, this);
 
 //        AccountManager accountManager = (AccountManager) getSystemService(Context.ACCOUNT_SERVICE);
